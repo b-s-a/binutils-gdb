@@ -65,6 +65,10 @@ static const char * arit_str[] =
 {
   "add a,", "adc a,", "sub ", "sbc a,", "and ", "xor ", "or ", "cp "
 } ;
+static const char * arit_str_gbz80[] =
+{
+  "add a,", "adc a,", "sub a,", "sbc a,", "and ", "xor ", "or ", "cp "
+} ;
 static const char * arit_str_ez80[] =
 {
   "add a,", "adc a,", "sub a,", "sbc a,", "and a,", "xor a,", "or a,", "cp a,"
@@ -72,7 +76,7 @@ static const char * arit_str_ez80[] =
 
 
 static int
-mach_inst (struct buffer *buf, struct tab_elt *p)
+mach_inst (struct buffer *buf, const struct tab_elt *p)
 {
   return !p->inss || (p->inss & buf->inss);
 }
@@ -268,7 +272,14 @@ static int
 arit_r (struct buffer *buf, disassemble_info * info, const char *txt)
 {
   const char * const *arit;
-  arit = (buf->inss & INSS_EZ80) ? arit_str_ez80 : arit_str;
+
+  if (buf->inss & INSS_EZ80)
+    arit = arit_str_ez80;
+  else if (buf->inss & INSS_GBZ80)
+    arit = arit_str_gbz80;
+  else
+    arit = arit_str;
+
   info->fprintf_func (info->stream, txt,
                       arit[(buf->data[buf->n_fetch - 1] >> 3) & 7],
                       r_str[buf->data[buf->n_fetch - 1] & 7]);
@@ -313,7 +324,13 @@ arit_n (struct buffer *buf, disassemble_info * info, const char *txt)
   char mytxt[TXTSIZ];
   const char * const *arit;
 
-  arit = (buf->inss & INSS_EZ80) ? arit_str_ez80 : arit_str;
+  if (buf->inss & INSS_EZ80)
+    arit = arit_str_ez80;
+  else if (buf->inss & INSS_GBZ80)
+    arit = arit_str_gbz80;
+  else
+    arit = arit_str;
+
   snprintf (mytxt,TXTSIZ, txt, arit[(buf->data[0] >> 3) & 7]);
   return prt_n (buf, info, mytxt);
 }
@@ -326,7 +343,7 @@ rst (struct buffer *buf, disassemble_info * info, const char *txt)
   return buf->n_used;
 }
 
-
+
 static int
 cis (struct buffer *buf, disassemble_info * info, const char *txt ATTRIBUTE_UNUSED)
 {
@@ -391,7 +408,7 @@ dump (struct buffer *buf, disassemble_info * info, const char *txt)
   buf->n_used = i;
   return buf->n_used;
 }
-
+
 /* Table to disassemble machine codes with prefix 0xED.  */
 struct tab_elt opc_ed[] =
 {
@@ -521,7 +538,7 @@ pref_cb (struct buffer *buf, disassemble_info *info,
 
   return buf->n_used;
 }
-
+
 static int
 addvv (struct buffer * buf, disassemble_info * info, const char *txt)
 {
@@ -767,7 +784,8 @@ suffix (struct buffer *buf, disassemble_info *info, const char *txt)
 }
 
 /* Table to disassemble machine codes without prefix.  */
-static struct tab_elt opc_main[] =
+static const struct tab_elt
+opc_main[] =
 {
   { 0x00, 0xFF, prt, "nop", INSS_ALL },
   { 0x01, 0xCF, prt_rr_nn, "ld %s,0x%%04x", INSS_ALL },
@@ -829,10 +847,71 @@ static struct tab_elt opc_main[] =
   { 0xEB, 0xFF, prt, "ex de,hl", ~INSS_GBZ80 },
   { 0xED, 0xFF, pref_ed, "", ~INSS_GBZ80 },
   { 0xF3, 0xFF, prt, "di", INSS_ALL },
-  { 0xF9, 0xFF, prt, "ld sp,hl", ~INSS_GBZ80 },
+  { 0xF9, 0xFF, prt, "ld sp,hl", INSS_ALL },
   { 0xFB, 0xFF, prt, "ei", INSS_ALL },
   { 0xFD, 0xFF, pref_ind, "iy", ~INSS_GBZ80 },
   { 0x00, 0x00, prt, "????", INSS_ALL },
+} ;
+
+/* Separate GBZ80 main opcode table due to many differences */
+static const struct tab_elt
+opc_main_gbz80[] =
+{
+  { 0x00, 0xFF, prt,"nop", INSS_ALL },
+  { 0x01, 0xCF, prt_rr_nn, "ld %s,0x%%04x", INSS_ALL },
+  { 0x02, 0xFF, prt, "ld (bc),a", INSS_ALL },
+  { 0x03, 0xCF, prt_rr, "inc ", INSS_ALL },
+  { 0x04, 0xC7, prt_r, "inc %s", INSS_ALL },
+  { 0x05, 0xC7, prt_r, "dec %s", INSS_ALL },
+  { 0x06, 0xC7, ld_r_n, "ld %s,0x%%02x", INSS_ALL },
+  { 0x07, 0xFF, prt, "rlca", INSS_ALL },
+  { 0x08, 0xFF, prt_nn, "ld (0x%04x),sp", INSS_GBZ80 },
+  { 0x09, 0xCF, prt_rr, "add hl,", INSS_ALL },
+  { 0x0A, 0xFF, prt, "ld a,(bc)", INSS_ALL },
+  { 0x0B, 0xCF, prt_rr, "dec ", INSS_ALL },
+  { 0x0F, 0xFF, prt, "rrca", INSS_ALL },
+  { 0x10, 0xFF, prt, "stop", INSS_GBZ80 },
+  { 0x12, 0xFF, prt, "ld (de),a", INSS_ALL },
+  { 0x17, 0xFF, prt, "rla", INSS_ALL },
+  { 0x18, 0xFF, prt_e, "jr ", INSS_ALL },
+  { 0x1A, 0xFF, prt, "ld a,(de)", INSS_ALL },
+  { 0x1F, 0xFF, prt, "rra", INSS_ALL },
+  { 0x20, 0xE7, jr_cc, "jr %s,", INSS_ALL },
+  { 0x22, 0xFF, prt, "ldi (hl),a", INSS_GBZ80 },
+  { 0x27, 0xFF, prt, "daa", INSS_ALL },
+  { 0x2A, 0xFF, prt, "ldi a,(hl)", INSS_GBZ80 },
+  { 0x2F, 0xFF, prt, "cpl", INSS_ALL },
+  { 0x32, 0xFF, prt, "ldd (hl),a", INSS_GBZ80 },
+  { 0x37, 0xFF, prt, "scf", INSS_ALL },
+  { 0x3A, 0xFF, prt, "ldd a,(hl)", INSS_GBZ80 },
+  { 0x3F, 0xFF, prt, "ccf", INSS_ALL },
+  { 0x76, 0xFF, prt, "halt", INSS_ALL },
+  { 0x40, 0xC0, ld_r_r, "ld %s,%s", INSS_ALL},
+  { 0x80, 0xC0, arit_r, "%s%s", INSS_ALL },
+  { 0xC0, 0xE7, prt_cc, "ret ", INSS_ALL },
+  { 0xC1, 0xCF, pop_rr, "pop", INSS_ALL },
+  { 0xC2, 0xE7, jp_cc_nn, "jp ", INSS_ALL },
+  { 0xC3, 0xFF, prt_nn, "jp 0x%04x", INSS_ALL },
+  { 0xC4, 0xE7, jp_cc_nn, "call ", INSS_ALL },
+  { 0xC5, 0xCF, pop_rr, "push", INSS_ALL },
+  { 0xC6, 0xC7, arit_n, "%s0x%%02x", INSS_ALL },
+  { 0xC7, 0xC7, rst, "rst 0x%02x", INSS_ALL },
+  { 0xC9, 0xFF, prt, "ret", INSS_ALL },
+  { 0xCB, 0xFF, pref_cb, "", INSS_ALL },
+  { 0xCD, 0xFF, prt_nn, "call 0x%04x", INSS_ALL },
+  { 0xD9, 0xFF, prt, "reti", INSS_GBZ80 },
+  { 0xE0, 0xFF, prt_n, "ldh (0x%02x),a", INSS_GBZ80 },
+  { 0xE2, 0xFF, prt, "ldh (c),a", INSS_GBZ80 },
+  { 0xE8, 0xFF, prt_d, "add sp,%d", INSS_GBZ80 },
+  { 0xE9, 0xFF, prt, "jp (hl)", INSS_ALL },
+  { 0xEA, 0xFF, prt_nn, "ld (0x%04x),a", INSS_GBZ80 },
+  { 0xF0, 0xFF, prt_n, "ldh a,(0x%02x)", INSS_GBZ80 },
+  { 0xF3, 0xFF, prt, "di", INSS_ALL },
+  { 0xF8, 0xFF, prt_d, "ldhl sp,%d", INSS_GBZ80 },
+  { 0xF9, 0xFF, prt, "ld sp,hl", INSS_ALL },
+  { 0xFA, 0xFF, prt_nn, "ld a,(0x%04x)", INSS_GBZ80 },
+  { 0xFB, 0xFF, prt, "ei", INSS_ALL },
+  { 0x00, 0x00, dump, "?", INSS_ALL },
 } ;
 
 int
@@ -851,14 +930,16 @@ print_insn_z80 (bfd_vma addr, disassemble_info * info)
 static int
 print_insn_z80_buf (struct buffer *buf, disassemble_info *info)
 {
-  struct tab_elt *p;
+  const struct tab_elt *p;
 
   buf->n_fetch = 0;
   buf->n_used = 0;
   if (! fetch_data (buf, info, 1))
     return -1;
 
-  for (p = opc_main; p->val != (buf->data[0] & p->mask) || !mach_inst (buf, p); ++p)
+  p = (buf->inss & INSS_GBZ80) ? opc_main_gbz80 : opc_main;
+
+  for (; p->val != (buf->data[0] & p->mask) || !mach_inst (buf, p); ++p)
     ;
   p->fp (buf, info, p->text);
 

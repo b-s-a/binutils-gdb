@@ -85,6 +85,7 @@ struct option md_longopts[] =
   { "z180",      no_argument, NULL, OPTION_MACH_Z180},
   { "ez80",      no_argument, NULL, OPTION_MACH_EZ80_Z80},
   { "ez80-adl",  no_argument, NULL, OPTION_MACH_EZ80_ADL},
+  { "gbz80",     no_argument, NULL, OPTION_MACH_GBZ80},
   { "fp-s",      required_argument, NULL, OPTION_FP_SINGLE_FORMAT},
   { "fp-d",      required_argument, NULL, OPTION_FP_DOUBLE_FORMAT},
   { "strict",    no_argument, NULL, OPTION_MACH_FUD},
@@ -330,6 +331,7 @@ CPU model options:\n\
   -z180\t\t\t  assemble for Z180\n\
   -ez80\t\t\t  assemble for eZ80 in Z80 mode by default\n\
   -ez80-adl\t\t  assemble for eZ80 in ADL mode by default\n\
+  -gbz80\t\t  assemble for GameBoy Z80\n\
 \n\
 Compatibility options:\n\
   -local-prefix=TEXT\t  treat labels prefixed by TEXT as local\n\
@@ -1340,6 +1342,25 @@ emit_s (char prefix, char opcode, const char *args)
 }
 
 static const char *
+emit_sub (char prefix, char opcode, const char *args)
+{
+  expressionS arg_s;
+  const char *p;
+
+  if (!(ins_ok & INS_GBZ80))
+    return emit_s (prefix, opcode, args);
+  p = parse_exp (args, & arg_s);
+  if (*p != ',' || arg_s.X_md != 0 || arg_s.X_op != O_register || arg_s.X_add_number != REG_A)
+    ill_op ();
+
+  ++p;
+  p = parse_exp (p, & arg_s);
+
+  emit_sx (prefix, opcode, & arg_s);
+  return p;
+}
+
+static const char *
 emit_call (char prefix ATTRIBUTE_UNUSED, char opcode, const char * args)
 {
   expressionS addr;
@@ -1575,6 +1596,14 @@ emit_add (char prefix, char opcode, const char * args)
       {
       case REG_A:
 	p = emit_s (0, prefix, p);
+	break;
+      case REG_SP:
+	p = parse_exp (p, &term);
+	if (!(ins_ok & INS_GBZ80) || term.X_md || term.X_op == O_register)
+	  ill_op ();
+	q = frag_more (1);
+	*q = 0xE8;
+	emit_byte (&term, BFD_RELOC_Z80_DISP8);
 	break;
       case REG_HL:
 	lhs = term.X_add_number;
@@ -1998,7 +2027,7 @@ emit_ld_m_r (expressionS *dst, expressionS *src)
       if (src->X_add_number == REG_A)
         {
           q = frag_more (1);
-          *q = 0x32;
+	  *q = (ins_ok & INS_GBZ80) ? 0xEA : 0x32;
           emit_word (dst);
           return;
         }
@@ -2140,7 +2169,7 @@ emit_ld_r_m (expressionS *dst, expressionS *src)
       if (dst->X_add_number == REG_A)
         {
           q = frag_more (1);
-          *q = 0x3A;
+	  *q = (ins_ok & INS_GBZ80) ? 0xFA : 0x3A;
           emit_word (src);
         }
     }
@@ -2208,8 +2237,6 @@ emit_ld_r_r (expressionS *dst, expressionS *src)
         default:
           ill_op ();
         }
-      if (ins_ok & INS_GBZ80)
-        ill_op ();
       opcode = 0xF9;
       break;
     case REG_HL:
@@ -2522,7 +2549,7 @@ emit_lddldi (char prefix, char opcode, const char * args)
   p = parse_exp (args, & dst);
   if (*p++ != ',')
     error (_("bad instruction syntax"));
-  p = parse_exp (args, & src);
+  p = parse_exp (p, & src);
 
   if (dst.X_op != O_register || src.X_op != O_register)
     ill_op ();
@@ -2601,6 +2628,29 @@ emit_ldh (char prefix ATTRIBUTE_UNUSED, char opcode ATTRIBUTE_UNUSED,
   else
     ill_op ();
 
+  return p;
+}
+
+static const char *
+emit_ldhl (char prefix ATTRIBUTE_UNUSED, char opcode, const char * args)
+{
+  expressionS dst, src;
+  const char *p;
+  char *q;
+  p = parse_exp (args, & dst);
+  if (*p++ != ',')
+    {
+      error (_("bad instruction syntax"));
+      return p;
+    }
+
+  p = parse_exp (p, & src);
+  if (dst.X_md || dst.X_op != O_register || dst.X_add_number != REG_SP
+      || src.X_md || src.X_op == O_register || src.X_op == O_md1)
+    ill_op ();
+  q = frag_more (1);
+  *q = opcode;
+  emit_byte (& src, BFD_RELOC_Z80_DISP8);
   return p;
 }
 
@@ -3192,7 +3242,7 @@ static table_t instab[] =
   { "ldd",  0xED, 0xA8, emit_lddldi,INS_ALL }, /* GBZ80 has special meaning */
   { "lddr", 0xED, 0xB8, emit_insn, INS_NOT_GBZ80 },
   { "ldh",  0xE0, 0x00, emit_ldh,  INS_GBZ80 },
-  { "ldhl", 0xE0, 0x00, emit_ldh,  INS_GBZ80 },
+  { "ldhl", 0x00, 0xF8, emit_ldhl, INS_GBZ80 },
   { "ldi",  0xED, 0xA0, emit_lddldi,INS_ALL }, /* GBZ80 has special meaning */
   { "ldir", 0xED, 0xB0, emit_insn, INS_NOT_GBZ80 },
   { "lea",  0xED, 0x02, emit_lea,  INS_EZ80 },
@@ -3248,7 +3298,7 @@ static table_t instab[] =
   { "srl",  0xCB, 0x38, emit_mr,   INS_ALL },
   { "stmix",0xED, 0x7D, emit_insn, INS_EZ80 },
   { "stop", 0x00, 0x10, emit_insn, INS_GBZ80 },
-  { "sub",  0x00, 0x90, emit_s,    INS_ALL },
+  { "sub",  0x00, 0x90, emit_sub,  INS_ALL },
   { "swap", 0xCB, 0x30, emit_mr,   INS_GBZ80 },
   { "tst",  0xED, 0x04, emit_tst,  INS_Z180|INS_EZ80 },
   { "tstio",0xED, 0x74, emit_tstio,INS_Z180|INS_EZ80 },

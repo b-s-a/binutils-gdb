@@ -53,6 +53,10 @@ Produce code for the eZ80 processor in Z80 memory mode by default.
 @item -ez80-adl
 Produce code for the eZ80 processor in ADL memory mode by default.
 
+@cindex @code{-gbz80} command-line option, Z80
+@item -gbz80
+Produce code for the GameBoy Z80 processor.
+
 @cindex @code{-local-prefix} command-line option, Z80
 @item  -local-prefix=@var{prefix}
 Mark all labels with specified prefix as local. But such label can be
