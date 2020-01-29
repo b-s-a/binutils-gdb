@@ -372,6 +372,8 @@ z80_is_local_label_name (bfd *        abfd ATTRIBUTE_UNUSED,
 #define TARGET_LITTLE_SYM		z80_elf32_vec
 #define TARGET_LITTLE_NAME		"elf32-z80"
 
+#define elf_backend_can_gc_sections		1
+
 #define elf_info_to_howto			NULL
 #define elf_info_to_howto_rel			z80_info_to_howto_rel
 #define elf_backend_object_p			z80_elf_set_mach_from_flags

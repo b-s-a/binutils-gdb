@@ -116,4 +116,26 @@ extern int z80_tc_label_is_local (const char *name);
 #define elf_tc_final_processing	z80_elf_final_processing
 extern void z80_elf_final_processing (void);
 
+/* Define the column that represents the PC.  */
+#define DWARF2_DEFAULT_RETURN_COLUMN	7
+
+/* The stack grows down, and is only byte aligned.  */
+#define DWARF2_CIE_DATA_ALIGNMENT	-1
+
+/* We want .cfi_* pseudo-ops for generating unwind info.  */
+#define TARGET_USE_CFIPOP		1
+
+/* Z80 instructions are 1 or 4 bytes long.  */
+#define DWARF2_LINE_MIN_INSN_LENGTH	1
+
+/* 16 bits addresses are used on Z80.  */
+#define DWARF2_ADDR_SIZE(bfd)		2
+
+/* CFI hooks.  */
+#define tc_cfi_frame_initial_instructions z80_tc_frame_initial_instructions
+extern void z80_tc_frame_initial_instructions (void);
+
+#define tc_regname_to_dw2regnum z80_tc_regname_to_dw2regnum
+extern int z80_tc_regname_to_dw2regnum (const char *regname);
+
 #endif

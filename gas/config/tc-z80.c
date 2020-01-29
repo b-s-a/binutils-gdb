@@ -24,6 +24,7 @@
 #include "subsegs.h"
 #include "elf/z80.h"
 #include "dwarf2dbg.h"
+#include "dw2gencfi.h"
 
 /* Exported constants.  */
 const char comment_chars[] = ";\0";
@@ -3761,4 +3762,35 @@ static const char *
 str_to_ieee754_d(char *litP, int *sizeP)
 {
   return ieee_md_atof ('d', litP, sizeP, FALSE);
+}
+
+/* Initialize the DWARF-2 unwind information for this procedure. */
+void
+z80_tc_frame_initial_instructions (void)
+{
+  static int sp_regno = -1;
+
+  if (sp_regno < 0)
+    sp_regno = z80_tc_regname_to_dw2regnum ("sp");
+
+  cfi_add_CFA_def_cfa (sp_regno, 0);
+}
+
+int
+z80_tc_regname_to_dw2regnum (const char *regname)
+{
+  static const char *regs[] =
+    { /* same registers as for GDB */
+      "af", "bc", "de", "hl",
+      "ix", "iy", "sp", "pc",
+      "af_", "bc_", "de_", "hl_",
+      "ir", "mbst" /* MB - eZ80 register, ST: bit0 - iff1, bit1 - iff2, bit2 - ADL, bit3 - MADL */
+    };
+  unsigned i;
+
+  for (i = 0; i < ARRAY_SIZE(regs); ++i)
+    if (!strcasecmp (regs[i], regname))
+      return i;
+
+  return -1;
 }
