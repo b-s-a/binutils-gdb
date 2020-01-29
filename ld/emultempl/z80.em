@@ -36,6 +36,7 @@ fragment <<EOF
 #define M_Z180      0x40
 #define M_EZ80_Z80  0x80
 #define M_EZ80_ADL  0x100
+#define M_Z80N      0x200
 #define M_ARCH_MASK 0xFF0
 
 /* Bitwise or of the machine types seen so far.  */
@@ -49,7 +50,6 @@ ${LDEMUL_BEFORE_PARSE} (void)
 #endif /* not TARGET_ */
   result_mach_type = 0;
 }
-
 
 /* Update result_mach_type.  */
 static bfd_boolean
@@ -78,6 +78,9 @@ ${LDEMUL_RECOGNIZED_FILE} (lang_input_statement_type *entry)
     case bfd_mach_z180:
       result_mach_type |= M_Z180;
       break;
+    case bfd_mach_z80n:
+      result_mach_type |= M_Z80N;
+      break;
     case bfd_mach_ez80_z80:
       result_mach_type |= M_EZ80_Z80;
       break;
@@ -104,10 +107,12 @@ gldz80_after_open (void)
     case M_Z80 & M_ARCH_MASK:
     case M_R800:
     case M_Z180:
+    case M_Z80N:
     case M_GBZ80:
     case M_EZ80_Z80:
     case M_EZ80_ADL:
     case M_EZ80_Z80 | M_Z180:
+    case M_EZ80_Z80 | M_Z80N:
       /* valid combination */
       break;
     case M_EZ80_Z80 | M_EZ80_ADL:
@@ -128,6 +133,8 @@ gldz80_after_open (void)
     mach_type = bfd_mach_ez80_z80;
   else if ((result_mach_type & M_Z180) == M_Z180)
     mach_type = bfd_mach_z180;
+  else if ((result_mach_type & M_Z80N) == M_Z80N)
+    mach_type = bfd_mach_z80n;
   else if ((result_mach_type & M_R800) == M_R800)
     mach_type = bfd_mach_r800;
   else if ((result_mach_type & M_GBZ80) == M_GBZ80)

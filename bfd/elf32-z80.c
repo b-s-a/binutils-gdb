@@ -44,6 +44,11 @@ typedef struct {
 #define BFD_EMPTY_HOWTO(rt,x) {rt, EMPTY_HOWTO(x)}
 #define BFD_HOWTO(rt,a,b,c,d,e,f,g,h,i,j,k,l,m) {rt, HOWTO(a,b,c,d,e,f,g,h,i,j,k,l,m)}
 
+static bfd_reloc_status_type
+z80_elf_16_be_reloc (bfd *abfd, arelent *reloc_entry, asymbol *symbol,
+		     void *data, asection *input_section, bfd *output_bfd,
+		     char **error_message);
+
 static const
 bfd_howto_type elf_z80_howto_table[] =
 {
@@ -253,6 +258,22 @@ bfd_howto_type elf_z80_howto_table[] =
 	 0,			/* src_mask */
 	 0xffff,		/* dst_mask */
 	 FALSE),		/* pcrel_offset */
+
+  /* An 16 bit big endian absolute relocation */
+  BFD_HOWTO (BFD_RELOC_Z80_16_BE,
+	 R_Z80_16_BE,		/* type */
+	 0,			/* rightshift */
+	 1,			/* size (0 = byte, 1 = short, 2 = long) */
+	 16,			/* bitsize */
+	 FALSE,			/* pc_relative */
+	 0,			/* bitpos */
+	 complain_overflow_bitfield,	/* complain_on_overflow */
+	 z80_elf_16_be_reloc,	/* special_function */
+	 "r_imm16be",		/* name */
+	 FALSE,			/* partial_inplace */
+	 0x00000000,		/* src_mask */
+	 0x0000ffff,		/* dst_mask */
+	 FALSE),		/* pcrel_offset */
 };
 
 static reloc_howto_type *
@@ -347,6 +368,9 @@ z80_elf_set_mach_from_flags (bfd *abfd)
     case EF_Z80_MACH_R800:
       mach = bfd_mach_r800;
       break;
+    case EF_Z80_MACH_Z80N:
+      mach = bfd_mach_z80n;
+      break;
     default:
       mach = bfd_mach_z80;
       break;
@@ -364,6 +388,56 @@ z80_is_local_label_name (bfd *        abfd ATTRIBUTE_UNUSED,
          _bfd_elf_is_local_label_name (abfd, name);
 }
 
+static bfd_reloc_status_type
+z80_elf_16_be_reloc (bfd *abfd,
+		     arelent *reloc_entry,
+		     asymbol *symbol,
+		     void *data,
+		     asection *input_section,
+		     bfd *output_bfd,
+		     char **error_message)
+{
+  bfd_vma val;
+  long x;
+  bfd_size_type octets = (reloc_entry->address
+                          * OCTETS_PER_BYTE (abfd, input_section));
+
+  /* If this is a relocatable link (output_bfd test tells us), just
+     call the generic function.  Any adjustment will be done at final
+     link time.  */
+  if (output_bfd != NULL)
+    return bfd_elf_generic_reloc (abfd, reloc_entry, symbol, data,
+                                  input_section, output_bfd, error_message);
+
+  /*if (reloc_entry->address > bfd_get_section_limit (abfd, input_section))
+    return bfd_reloc_outofrange;*/
+
+  /* Get symbol value.  */
+  val = 0;
+  if (!bfd_is_com_section (symbol->section))
+    val = symbol->value;
+  val += symbol->section->output_offset + input_section->output_offset;
+  if (symbol->section->output_section)
+    val += symbol->section->output_section->vma;
+
+  val += reloc_entry->addend;
+  if (reloc_entry->howto->partial_inplace)
+    {
+      x = bfd_get_8 (abfd, (bfd_byte *) data + octets + 0) * 0x100;
+      x += bfd_get_8 (abfd, (bfd_byte *) data + octets + 1);
+      x &= ~reloc_entry->howto->src_mask;
+    }
+  else
+    x = 0;
+
+  x |= val & reloc_entry->howto->dst_mask;
+  if (x < -0x8000 || x >= 0x10000)
+    return bfd_reloc_outofrange;
+
+  bfd_put_8 (abfd, x >> 8, (bfd_byte *) data + octets + 0);
+  bfd_put_8 (abfd, x >> 0, (bfd_byte *) data + octets + 1);
+  return bfd_reloc_ok;
+}
 
 #define ELF_ARCH		bfd_arch_z80
 #define ELF_MACHINE_CODE	EM_Z80

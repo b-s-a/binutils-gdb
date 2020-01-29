@@ -52,6 +52,7 @@ struct tab_elt
 #define INSS_EZ80_Z80 (1 << bfd_mach_ez80_z80)
 #define INSS_EZ80_ADL (1 << bfd_mach_ez80_adl)
 #define INSS_EZ80 (INSS_EZ80_ADL | INSS_EZ80_Z80)
+#define INSS_Z80N (1 << bfd_mach_z80n)
 
 #define TXTSIZ 24
 /* Names of 16-bit registers.  */
@@ -193,6 +194,27 @@ prt_n (struct buffer *buf, disassemble_info * info, const char *txt)
     buf->n_used = -1;
 
   return buf->n_used;
+}
+
+static int
+prt_n_n (struct buffer *buf, disassemble_info * info, const char *txt)
+{
+  char mytxt[TXTSIZ];
+  int n;
+  unsigned char *p;
+
+  p = (unsigned char*) buf->data + buf->n_fetch;
+
+  if (fetch_data (buf, info, 1))
+    {
+      n = p[0];
+      snprintf (mytxt, TXTSIZ, txt, n);
+      buf->n_used = buf->n_fetch;
+    }
+  else
+    buf->n_used = -1;
+
+  return prt_n (buf, info, mytxt);
 }
 
 static int
@@ -412,7 +434,9 @@ dump (struct buffer *buf, disassemble_info * info, const char *txt)
 /* Table to disassemble machine codes with prefix 0xED.  */
 struct tab_elt opc_ed[] =
 {
-  { 0x30, 0xFE, dump, "xx", INSS_ALL },
+  { 0x30, 0xFF, prt, "mul d,e", INSS_Z80N },
+  { 0x31, 0xFF, prt, "add hl,a", INSS_Z80N },
+  { 0x30, 0xFE, dump, "xx", INSS_ALL }, /* do not move this line */
   { 0x00, 0xC7, prt_r_n, "in0 %s,(0x%%02x)", INSS_Z180|INSS_EZ80 },
   { 0x01, 0xC7, prt_r_n, "out0 (0x%%02x),%s", INSS_Z180|INSS_EZ80 },
   { 0x32, 0xFF, prt_d, "lea ix,ix%+d", INSS_EZ80 },
@@ -424,17 +448,30 @@ struct tab_elt opc_ed[] =
   { 0x07, 0xFF, prt, "ld bc,(hl)", INSS_EZ80 },
   { 0x0F, 0xCF, prt_rr, "ld (hl),", INSS_EZ80 },
   { 0x17, 0xFF, prt, "ld de,(hl)", INSS_EZ80 },
+  { 0x23, 0xFF, prt, "swapnib", INSS_Z80N },
+  { 0x24, 0xFF, prt, "mirror", INSS_Z80N },
   { 0x27, 0xFF, prt, "ld hl,(hl)", INSS_EZ80 },
+  { 0x27, 0xFF, prt_n, "test 0x%02x", INSS_Z80N },
+  { 0x28, 0xFF, prt, "bsla de,b", INSS_Z80N },
+  { 0x29, 0xFF, prt, "bsra de,b", INSS_Z80N },
+  { 0x2A, 0xFF, prt, "bsrl de,b", INSS_Z80N },
+  { 0x2B, 0xFF, prt, "bsrf de,b", INSS_Z80N },
+  { 0x2C, 0xFF, prt, "bslc de,b", INSS_Z80N },
+  { 0x32, 0xFF, prt, "add de,a", INSS_Z80N },
+  { 0x33, 0xFF, prt, "add bc,a", INSS_Z80N },
+  { 0x34, 0xFF, prt_nn, "add hl,0x%04x", INSS_Z80N },
+  { 0x35, 0xFF, prt_nn, "add de,0x%04x", INSS_Z80N },
+  { 0x36, 0xFF, prt_nn, "add bc,0x%04x", INSS_Z80N },
   { 0x36, 0xFF, prt, "ld iy,(hl)", INSS_EZ80 },
   { 0x37, 0xFF, prt, "ld ix,(hl)", INSS_EZ80 },
   { 0x3E, 0xFF, prt, "ld (hl),iy", INSS_EZ80 },
   { 0x3F, 0xFF, prt, "ld (hl),ix", INSS_EZ80 },
-  { 0x70, 0xFF, prt, "in f,(c)", INSS_Z80 | INSS_R800 },
+  { 0x70, 0xFF, prt, "in f,(c)", INSS_Z80 | INSS_R800 | INSS_Z80N },
   { 0x70, 0xFF, dump, "xx", INSS_ALL },
   { 0x40, 0xC7, prt_r, "in %s,(bc)", INSS_EZ80 },
   { 0x40, 0xC7, prt_r, "in %s,(c)", INSS_ALL },
-  { 0x71, 0xFF, prt, "out (c),0", INSS_Z80 },
-  { 0x70, 0xFF, dump, "xx", INSS_ALL },
+  { 0x71, 0xFF, prt, "out (c),0", INSS_Z80 | INSS_Z80N },
+  { 0x71, 0xFF, dump, "xx", INSS_ALL },
   { 0x41, 0xC7, prt_r, "out (bc),%s", INSS_EZ80 },
   { 0x41, 0xC7, prt_r, "out (c),%s", INSS_ALL },
   { 0x42, 0xCF, prt_rr, "sbc hl,", INSS_ALL },
@@ -459,24 +496,38 @@ struct tab_elt opc_ed[] =
   { 0x65, 0xFF, prt_d, "pea ix%+d", INSS_EZ80 },
   { 0x66, 0xFF, prt_d, "pea iy%+d", INSS_EZ80 },
   { 0x67, 0xFF, prt, "rrd", INSS_ALL },
+  { 0x6D, 0xFF, prt, "ld mb,a", INSS_EZ80 },
+  { 0x6E, 0xFF, prt, "ld a,mb", INSS_EZ80 },
   { 0x6F, 0xFF, prt, "rld", INSS_ALL },
   { 0x74, 0xFF, prt_n, "tstio 0x%02x", INSS_Z180|INSS_EZ80 },
   { 0x76, 0xFF, prt, "slp", INSS_Z180|INSS_EZ80 },
-  { 0x82, 0xE6, cism, "", INSS_Z180|INSS_EZ80 },
-  { 0x84, 0xC7, cis2, "", INSS_EZ80 },
-  { 0xA0, 0xE4, cis, "", INSS_ALL },
   { 0x7D, 0xFF, prt, "stmix", INSS_EZ80 },
   { 0x7E, 0xFF, prt, "rsmix", INSS_EZ80 },
-  { 0x6D, 0xFF, prt, "ld mb,a", INSS_EZ80 },
-  { 0x6E, 0xFF, prt, "ld a,mb", INSS_EZ80 },
-  { 0xC7, 0xFF, prt, "ld i,hl", INSS_EZ80 },
-  { 0xD7, 0xFF, prt, "ld hl,i", INSS_EZ80 },
+  { 0x82, 0xE6, cism, "", INSS_Z180|INSS_EZ80 },
+  { 0x84, 0xC7, cis2, "", INSS_EZ80 },
+  { 0x8A, 0xFF, prt_n_n, "push 0x%02x%%02x", INSS_Z80N },
+  { 0x90, 0xFF, prt, "outinb", INSS_Z80N },
+  { 0x91, 0xFF, prt_n_n, "nextreg 0x%02x,0x%%02x", INSS_Z80N },
+  { 0x92, 0xFF, prt_n, "nextreg 0x%02x,a", INSS_Z80N },
+  { 0x93, 0xFF, prt, "pixeldn", INSS_Z80N },
+  { 0x94, 0xFF, prt, "pixelad", INSS_Z80N },
+  { 0x95, 0xFF, prt, "setae", INSS_Z80N },
+  { 0x98, 0xFF, prt, "jp (c)", INSS_Z80N },
+  { 0xA0, 0xE4, cis, "", INSS_ALL },
+  { 0xA4, 0xFF, prt, "ldix", INSS_Z80N },
+  { 0xAC, 0xFF, prt, "lddx", INSS_Z80N },
+  { 0xA5, 0xFF, prt, "ldws", INSS_Z80N },
+  { 0xB4, 0xFF, prt, "ldirx", INSS_Z80N },
+  { 0xB7, 0xFF, prt, "ldpirx", INSS_Z80N },
+  { 0xBC, 0xFF, prt, "lddrx", INSS_Z80N },
   { 0xC2, 0xFF, prt, "inirx", INSS_EZ80 },
   { 0xC3, 0xFF, prt, "otirx", INSS_EZ80 },
+  { 0xC7, 0xFF, prt, "ld i,hl", INSS_EZ80 },
   { 0xCA, 0xFF, prt, "indrx", INSS_EZ80 },
   { 0xCB, 0xFF, prt, "otdrx", INSS_EZ80 },
   { 0xC3, 0xFF, prt, "muluw hl,bc", INSS_R800 },
   { 0xC5, 0xE7, prt_r, "mulub a,%s", INSS_R800 },
+  { 0xD7, 0xFF, prt, "ld hl,i", INSS_EZ80 },
   { 0xF3, 0xFF, prt, "muluw hl,sp", INSS_R800 },
   { 0x00, 0x00, dump, "xx", INSS_ALL }
 };
