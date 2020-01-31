@@ -344,41 +344,98 @@ z80_info_to_howto_rel (bfd *abfd, arelent *cache_ptr, Elf_Internal_Rela *dst)
   return FALSE;
 }
 
+/* The final processing done just before writing out a Z80 ELF object
+   file.  This gets the Z80 architecture right based on the machine
+   number.  */
+
 static bfd_boolean
-z80_elf_set_mach_from_flags (bfd *abfd)
+z80_elf_final_write_processing (bfd *abfd)
 {
-  int mach;
-  switch (elf_elfheader (abfd)->e_flags)
+  unsigned long val = bfd_get_mach (abfd);
+
+  switch (val)
     {
-    case EF_Z80_MACH_GBZ80:
-      mach = bfd_mach_gbz80;
-      break;
-    case EF_Z80_MACH_Z80:
-      mach = bfd_mach_z80;
-      break;
-    case EF_Z80_MACH_Z180:
-      mach = bfd_mach_z180;
-      break;
-    case EF_Z80_MACH_EZ80_Z80:
-      mach = bfd_mach_ez80_z80;
-      break;
-    case EF_Z80_MACH_EZ80_ADL:
-      mach = bfd_mach_ez80_adl;
-      break;
-    case EF_Z80_MACH_R800:
-      mach = bfd_mach_r800;
-      break;
-    case EF_Z80_MACH_Z80N:
-      mach = bfd_mach_z80n;
-      break;
     default:
-      mach = bfd_mach_z80;
+      _bfd_error_handler (_("%pB: unsupported bfd mach %#lx"),
+			  abfd, val);
+      /* fall through */
+    case bfd_mach_z80:
+    case bfd_mach_z80full:
+    case bfd_mach_z80strict:
+      val = EF_Z80_MACH_Z80;
+      break;
+    case bfd_mach_gbz80:
+      val = EF_Z80_MACH_GBZ80;
+      break;
+    case bfd_mach_z80n:
+      val = EF_Z80_MACH_Z80N;
+      break;
+    case bfd_mach_z180:
+      val = EF_Z80_MACH_Z180;
+      break;
+    case bfd_mach_ez80_z80:
+      val = EF_Z80_MACH_EZ80_Z80;
+      break;
+    case bfd_mach_ez80_adl:
+      val = EF_Z80_MACH_EZ80_ADL;
+      break;
+    case bfd_mach_r800:
+      val = EF_Z80_MACH_R800;
       break;
     }
-
-  bfd_default_set_arch_mach (abfd, bfd_arch_z80, mach);
-  return TRUE;
+  elf_elfheader (abfd)->e_machine = EM_Z80;
+  elf_elfheader (abfd)->e_flags &= ~EF_Z80_MACH_MSK;
+  elf_elfheader (abfd)->e_flags |= val;
+  return _bfd_elf_final_write_processing (abfd);
 }
+
+/* Set the right machine number.  */
+static bfd_boolean
+z80_elf_object_p (bfd *abfd)
+{
+  unsigned int mach;
+
+  if (elf_elfheader (abfd)->e_machine == EM_Z80)
+    {
+      int e_mach = elf_elfheader (abfd)->e_flags & EF_Z80_MACH_MSK;
+      switch (e_mach)
+        {
+        default:
+	  _bfd_error_handler (_("%pB: unsupported mach %#x"),
+			      abfd, e_mach);
+	  /* fall through */
+	case EF_Z80_MACH_Z80:
+	  mach = bfd_mach_z80;
+	  break;
+	case EF_Z80_MACH_GBZ80:
+	  mach = bfd_mach_gbz80;
+	  break;
+	case EF_Z80_MACH_Z180:
+	  mach = bfd_mach_z180;
+	  break;
+	case EF_Z80_MACH_EZ80_Z80:
+	  mach = bfd_mach_ez80_z80;
+	  break;
+	case EF_Z80_MACH_EZ80_ADL:
+	  mach = bfd_mach_ez80_adl;
+	  break;
+	case EF_Z80_MACH_R800:
+	  mach = bfd_mach_r800;
+	  break;
+	case EF_Z80_MACH_Z80N:
+	  mach = bfd_mach_z80n;
+	  break;
+        }
+    }
+  else
+    {
+      _bfd_error_handler (_("%pB: unsupported arch %#x"),
+			  abfd, elf_elfheader (abfd)->e_machine);
+      mach = bfd_mach_z80;
+    }
+  return bfd_default_set_arch_mach (abfd, bfd_arch_z80, mach);
+}
+
 
 static int
 z80_is_local_label_name (bfd *        abfd ATTRIBUTE_UNUSED,
@@ -450,7 +507,9 @@ z80_elf_16_be_reloc (bfd *abfd,
 
 #define elf_info_to_howto			NULL
 #define elf_info_to_howto_rel			z80_info_to_howto_rel
-#define elf_backend_object_p			z80_elf_set_mach_from_flags
+#define elf_backend_final_write_processing	z80_elf_final_write_processing
+#define elf_backend_object_p			z80_elf_object_p
 #define bfd_elf32_bfd_is_local_label_name	z80_is_local_label_name
+
 
 #include "elf32-target.h"
