@@ -3593,12 +3593,38 @@ is_overflow (long value, unsigned bitsize)
 }
 
 void
-md_apply_fix (fixS * fixP, valueT* valP, segT seg ATTRIBUTE_UNUSED)
+md_apply_fix (fixS * fixP, valueT* valP, segT seg)
 {
-  long val = (long)*valP;
+  long val = *valP;
   char *p_lit = fixP->fx_where + fixP->fx_frag->fr_literal;
 
-  fixP->fx_done = (fixP->fx_addsy == NULL);
+  if (fixP->fx_addsy == NULL)
+    fixP->fx_done = 1;
+  else if (fixP->fx_pcrel)
+    {
+      segT s = S_GET_SEGMENT (fixP->fx_addsy);
+      if (s == seg || s == absolute_section)
+	{
+	  val += S_GET_VALUE (fixP->fx_addsy);
+	  fixP->fx_done = 1;
+	}
+    }
+
+  switch (fixP->fx_r_type)
+    {
+    case BFD_RELOC_8_PCREL:
+    case BFD_RELOC_Z80_DISP8:
+    case BFD_RELOC_8:
+    case BFD_RELOC_16:
+    case BFD_RELOC_24:
+    case BFD_RELOC_32:
+    case BFD_RELOC_Z80_16_BE:
+      fixP->fx_no_overflow = 0;
+      break;
+    default:
+      fixP->fx_no_overflow = 1;
+      break;
+    }
 
   switch (fixP->fx_r_type)
     {
@@ -3608,27 +3634,22 @@ md_apply_fix (fixS * fixP, valueT* valP, segT seg ATTRIBUTE_UNUSED)
 	as_bad_where (fixP->fx_file, fixP->fx_line,
 		      _("8-bit signed offset out of range (%+ld)"), val);
       *p_lit++ = val;
-      fixP->fx_no_overflow = 0;
       break;
 
     case BFD_RELOC_Z80_BYTE0:
       *p_lit++ = val;
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE1:
       *p_lit++ = (val >> 8);
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE2:
       *p_lit++ = (val >> 16);
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE3:
       *p_lit++ = (val >> 24);
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_8:
@@ -3641,13 +3662,11 @@ md_apply_fix (fixS * fixP, valueT* valP, segT seg ATTRIBUTE_UNUSED)
     case BFD_RELOC_Z80_WORD1:
       *p_lit++ = (val >> 16);
       *p_lit++ = (val >> 24);
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_Z80_WORD0:
       *p_lit++ = val;
       *p_lit++ = (val >> 8);
-      fixP->fx_no_overflow = 1;
       break;
 
     case BFD_RELOC_16:
@@ -3703,11 +3722,9 @@ tc_gen_reloc (asection *seg ATTRIBUTE_UNUSED , fixS *fixp)
 {
   arelent *reloc;
 
-  if (! bfd_reloc_type_lookup (stdoutput, fixp->fx_r_type))
+  if (fixp->fx_subsy != NULL)
     {
-      as_bad_where (fixp->fx_file, fixp->fx_line,
-		    _("reloc %d not supported by object file format"),
-		    (int) fixp->fx_r_type);
+      as_bad_where (fixp->fx_file, fixp->fx_line, _("expression too complex"));
       return NULL;
     }
 
@@ -3715,8 +3732,19 @@ tc_gen_reloc (asection *seg ATTRIBUTE_UNUSED , fixS *fixp)
   reloc->sym_ptr_ptr  = XNEW (asymbol *);
   *reloc->sym_ptr_ptr = symbol_get_bfdsym (fixp->fx_addsy);
   reloc->address      = fixp->fx_frag->fr_address + fixp->fx_where;
-  reloc->howto        = bfd_reloc_type_lookup (stdoutput, fixp->fx_r_type);
   reloc->addend       = fixp->fx_offset;
+  reloc->howto        = bfd_reloc_type_lookup (stdoutput, fixp->fx_r_type);
+  if (reloc->howto == NULL)
+    {
+      as_bad_where (fixp->fx_file, fixp->fx_line,
+		    _("reloc %d not supported by object file format"),
+		    (int) fixp->fx_r_type);
+      return NULL;
+    }
+
+  if (fixp->fx_r_type == BFD_RELOC_VTABLE_INHERIT
+      || fixp->fx_r_type == BFD_RELOC_VTABLE_ENTRY)
+    reloc->address = fixp->fx_offset;
 
   return reloc;
 }
