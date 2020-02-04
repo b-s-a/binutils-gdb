@@ -33,7 +33,7 @@
 /* Relocation functions.  */
 static reloc_howto_type *bfd_elf32_bfd_reloc_type_lookup
   (bfd *, bfd_reloc_code_real_type);
-static bfd_boolean z80_info_to_howto_rel
+static bfd_boolean z80_info_to_howto_rela
   (bfd *, arelent *, Elf_Internal_Rela *);
 
 typedef struct {
@@ -319,7 +319,7 @@ bfd_elf32_bfd_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED, const char *r_name)
 /* Set the howto pointer for an z80 ELF reloc.  */
 
 static bfd_boolean
-z80_info_to_howto_rel (bfd *abfd, arelent *cache_ptr, Elf_Internal_Rela *dst)
+z80_info_to_howto_rela (bfd *abfd, arelent *cache_ptr, Elf_Internal_Rela *dst)
 {
   enum
     {
@@ -504,9 +504,10 @@ z80_elf_16_be_reloc (bfd *abfd,
 #define TARGET_LITTLE_NAME		"elf32-z80"
 
 #define elf_backend_can_gc_sections		1
+#define elf_backend_stack_align			1
 
-#define elf_info_to_howto			NULL
-#define elf_info_to_howto_rel			z80_info_to_howto_rel
+#define elf_info_to_howto			z80_info_to_howto_rela
+#define elf_info_to_howto_rel			z80_info_to_howto_rela
 #define elf_backend_final_write_processing	z80_elf_final_write_processing
 #define elf_backend_object_p			z80_elf_object_p
 #define bfd_elf32_bfd_is_local_label_name	z80_is_local_label_name
