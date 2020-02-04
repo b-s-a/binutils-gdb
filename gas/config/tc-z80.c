@@ -1139,7 +1139,6 @@ static void
 emit_byte (expressionS * val, bfd_reloc_code_real_type r_type)
 {
   char *p;
-  int lo, hi;
 
   if (r_type == BFD_RELOC_8)
     {
@@ -1158,15 +1157,12 @@ emit_byte (expressionS * val, bfd_reloc_code_real_type r_type)
     }
   else if (val->X_op == O_constant)
     {
-      lo = -128;
-      hi = (BFD_RELOC_8 == r_type) ? 255 : 127;
-
-      if ((val->X_add_number < lo) || (val->X_add_number > hi))
+      if ((val->X_add_number < -128) || (val->X_add_number >= 128))
 	{
 	  if (r_type == BFD_RELOC_Z80_DISP8)
-	    as_bad (_("offset too large"));
+	    as_bad (_("index overflow (%+ld)"), val->X_add_number);
 	  else
-	    as_warn (_("overflow"));
+	    as_bad (_("offset overflow (%+ld)"), val->X_add_number);
 	}
     }
   else
@@ -3584,129 +3580,110 @@ end:
   input_line_pointer = old_ptr;
 }
 
+static int
+is_overflow (long value, unsigned bitsize)
+{
+  long fieldmask = (1 << bitsize) - 1;
+  long signmask = ~fieldmask;
+  long a = value & fieldmask;
+  long ss = a & signmask;
+  if (ss != 0 && ss != (signmask & fieldmask))
+    return 1;
+  return 0;
+}
+
 void
 md_apply_fix (fixS * fixP, valueT* valP, segT seg ATTRIBUTE_UNUSED)
 {
-  long val = * (long *) valP;
+  long val = (long)*valP;
   char *p_lit = fixP->fx_where + fixP->fx_frag->fr_literal;
+
+  fixP->fx_done = (fixP->fx_addsy == NULL);
 
   switch (fixP->fx_r_type)
     {
     case BFD_RELOC_8_PCREL:
-      if (fixP->fx_addsy)
-        {
-          fixP->fx_no_overflow = 1;
-          fixP->fx_done = 0;
-        }
-      else
-        {
-	  fixP->fx_no_overflow = (-128 <= val && val < 128);
-	  if (!fixP->fx_no_overflow)
-            as_bad_where (fixP->fx_file, fixP->fx_line,
-			  _("relative jump out of range"));
-	  *p_lit++ = val;
-          fixP->fx_done = 1;
-        }
-      break;
-
     case BFD_RELOC_Z80_DISP8:
-      if (fixP->fx_addsy)
-        {
-          fixP->fx_no_overflow = 1;
-          fixP->fx_done = 0;
-        }
-      else
-        {
-	  fixP->fx_no_overflow = (-128 <= val && val < 128);
-	  if (!fixP->fx_no_overflow)
-            as_bad_where (fixP->fx_file, fixP->fx_line,
-			  _("index offset out of range"));
-	  *p_lit++ = val;
-          fixP->fx_done = 1;
-        }
+      if (fixP->fx_done && (val < -0x80 || val > 0x7f))
+	as_bad_where (fixP->fx_file, fixP->fx_line,
+		      _("8-bit signed offset out of range (%+ld)"), val);
+      *p_lit++ = val;
+      fixP->fx_no_overflow = 0;
       break;
 
     case BFD_RELOC_Z80_BYTE0:
       *p_lit++ = val;
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-        fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE1:
       *p_lit++ = (val >> 8);
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-        fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE2:
       *p_lit++ = (val >> 16);
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-        fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_BYTE3:
       *p_lit++ = (val >> 24);
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-        fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_8:
-      if (val > 255 || val < -128)
-	as_warn_where (fixP->fx_file, fixP->fx_line, _("overflow"));
+      if (fixP->fx_done && is_overflow(val, 8))
+	as_warn_where (fixP->fx_file, fixP->fx_line,
+		       _("8-bit overflow (%+ld)"), val);
       *p_lit++ = val;
-      fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-	fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_WORD1:
       *p_lit++ = (val >> 16);
       *p_lit++ = (val >> 24);
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-        fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_WORD0:
-    case BFD_RELOC_16:
       *p_lit++ = val;
       *p_lit++ = (val >> 8);
       fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-	fixP->fx_done = 1;
+      break;
+
+    case BFD_RELOC_16:
+      if (fixP->fx_done && is_overflow(val, 16))
+	as_warn_where (fixP->fx_file, fixP->fx_line,
+		       _("16-bit overflow (%+ld)"), val);
+      *p_lit++ = val;
+      *p_lit++ = (val >> 8);
       break;
 
     case BFD_RELOC_24: /* Def24 may produce this.  */
+      if (fixP->fx_done && is_overflow(val, 24))
+	as_warn_where (fixP->fx_file, fixP->fx_line,
+		       _("24-bit overflow (%+ld)"), val);
       *p_lit++ = val;
       *p_lit++ = (val >> 8);
       *p_lit++ = (val >> 16);
-      fixP->fx_no_overflow = 1;
-      if (fixP->fx_addsy == NULL)
-	fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_32: /* Def32 and .long may produce this.  */
+      if (fixP->fx_done && is_overflow(val, 32))
+	as_warn_where (fixP->fx_file, fixP->fx_line,
+		       _("32-bit overflow (%+ld)"), val);
       *p_lit++ = val;
       *p_lit++ = (val >> 8);
       *p_lit++ = (val >> 16);
       *p_lit++ = (val >> 24);
-      if (fixP->fx_addsy == NULL)
-	fixP->fx_done = 1;
       break;
 
     case BFD_RELOC_Z80_16_BE: /* Z80N PUSH nn instruction produce this.  */
       *p_lit++ = val >> 8;
       *p_lit++ = val;
-      if (fixP->fx_addsy == NULL)
-	fixP->fx_done = 1;
       break;
 
     default:
-      printf (_("md_apply_fix: unknown r_type 0x%x\n"), fixP->fx_r_type);
+      printf (_("md_apply_fix: unknown reloc type 0x%x\n"), fixP->fx_r_type);
       abort ();
     }
 }
