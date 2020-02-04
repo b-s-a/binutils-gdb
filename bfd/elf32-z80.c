@@ -30,12 +30,6 @@
 /* All users of this file have bfd_octets_per_byte (abfd, sec) == 1.  */
 #define OCTETS_PER_BYTE(ABFD, SEC) 1
 
-/* Relocation functions.  */
-static reloc_howto_type *bfd_elf32_bfd_reloc_type_lookup
-  (bfd *, bfd_reloc_code_real_type);
-static bfd_boolean z80_info_to_howto_rela
-  (bfd *, arelent *, Elf_Internal_Rela *);
-
 typedef struct {
   bfd_reloc_code_real_type r_type;
   reloc_howto_type howto;
@@ -277,8 +271,8 @@ bfd_howto_type elf_z80_howto_table[] =
 };
 
 static reloc_howto_type *
-bfd_elf32_bfd_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED,
-                                 bfd_reloc_code_real_type code)
+z80_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED,
+		       bfd_reloc_code_real_type code)
 {
   enum
     {
@@ -289,16 +283,16 @@ bfd_elf32_bfd_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED,
   for (i = 0; i < table_size; i++)
     {
       if (elf_z80_howto_table[i].r_type == code)
-          return &elf_z80_howto_table[i].howto;
+	  return &elf_z80_howto_table[i].howto;
     }
 
-  printf ("%s:%d Not found type %d\n", __FILE__, __LINE__, code);
+  printf ("%s:%d Not found BFD reloc type %d\n", __FILE__, __LINE__, code);
 
   return NULL;
 }
 
 static reloc_howto_type *
-bfd_elf32_bfd_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED, const char *r_name)
+z80_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED, const char *r_name)
 {
   enum
     {
@@ -309,39 +303,159 @@ bfd_elf32_bfd_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED, const char *r_name)
   for (i = 0; i < table_size; i++)
     {
       if (elf_z80_howto_table[i].howto.name != NULL
-          && strcasecmp (elf_z80_howto_table[i].howto.name, r_name) == 0)
-        return &elf_z80_howto_table[i].howto;
+	  && strcasecmp (elf_z80_howto_table[i].howto.name, r_name) == 0)
+	return &elf_z80_howto_table[i].howto;
     }
+
+  printf ("%s:%d Not found ELF reloc name `%s'\n", __FILE__, __LINE__, r_name);
 
   return NULL;
 }
+
+static reloc_howto_type *
+z80_rtype_to_howto (bfd *abfd, unsigned r_type)
+{
+  enum
+    {
+      table_size = sizeof (elf_z80_howto_table) / sizeof (elf_z80_howto_table[0])
+    };
+  unsigned int i;
+
+  for (i = 0; i < table_size; i++)
+    {
+      if (elf_z80_howto_table[i].howto.type == r_type)
+	  return &elf_z80_howto_table[i].howto;
+    }
+
+  /* xgettext:c-format */
+  _bfd_error_handler (_("%pB: unsupported ELF relocation type %#x"),
+		      abfd, r_type);
+  return NULL;
+} 
 
 /* Set the howto pointer for an z80 ELF reloc.  */
 
 static bfd_boolean
 z80_info_to_howto_rela (bfd *abfd, arelent *cache_ptr, Elf_Internal_Rela *dst)
 {
-  enum
-    {
-      table_size = sizeof (elf_z80_howto_table) / sizeof (elf_z80_howto_table[0])
-    };
-  unsigned int  i;
   unsigned int  r_type = ELF32_R_TYPE (dst->r_info);
-
-  for (i = 0; i < table_size; i++)
+  reloc_howto_type *howto = z80_rtype_to_howto (abfd, r_type);
+  if (howto != NULL)
     {
-      if (elf_z80_howto_table[i].howto.type == r_type)
-        {
-          cache_ptr->howto = &elf_z80_howto_table[i].howto;
-          return TRUE;
-        }
+      cache_ptr->howto = howto;
+      return TRUE;
     }
-
-  /* xgettext:c-format */
-  _bfd_error_handler (_("%pB: unsupported relocation type %#x"),
-                      abfd, r_type);
   bfd_set_error (bfd_error_bad_value);
   return FALSE;
+}
+
+static bfd_reloc_status_type
+z80_elf_final_link_relocate (unsigned long r_type,
+			     bfd *input_bfd,
+			     bfd *output_bfd ATTRIBUTE_UNUSED,
+			     asection *input_section ATTRIBUTE_UNUSED,
+			     bfd_byte *contents,
+			     bfd_vma offset,
+			     bfd_vma value,
+			     bfd_vma addend,
+			     struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			     asection *sym_sec ATTRIBUTE_UNUSED,
+			     int is_local ATTRIBUTE_UNUSED)
+{
+  bfd_boolean r;
+  reloc_howto_type *howto;
+
+  switch (r_type)
+    {
+    case R_Z80_16_BE:
+      value += addend;
+      bfd_put_8 (input_bfd, value >> 8, contents + offset + 0);
+      bfd_put_8 (input_bfd, value >> 0, contents + offset + 1);
+      return bfd_reloc_ok;
+    }
+
+  howto = z80_rtype_to_howto (input_bfd, r_type);
+  if (howto == NULL)
+    return bfd_reloc_notsupported;
+
+  r = _bfd_final_link_relocate (howto, input_bfd, input_section, contents,
+				offset, value, addend);
+  return r ? bfd_reloc_ok : bfd_reloc_notsupported;
+}
+
+static bfd_boolean
+z80_elf_relocate_section (bfd *output_bfd,
+			  struct bfd_link_info *info,
+			  bfd *input_bfd,
+			  asection *input_section,
+			  bfd_byte *contents,
+			  Elf_Internal_Rela *relocs,
+			  Elf_Internal_Sym *local_syms,
+			  asection **local_sections)
+{
+  Elf_Internal_Shdr *symtab_hdr;
+  struct elf_link_hash_entry **sym_hashes;
+  Elf_Internal_Rela *rel, *relend;
+
+  symtab_hdr = &elf_tdata (input_bfd)->symtab_hdr;
+  sym_hashes = elf_sym_hashes (input_bfd);
+
+  rel = relocs;
+  relend = relocs + input_section->reloc_count;
+  for (; rel < relend; rel++)
+    {
+      unsigned int r_type;
+      unsigned long r_symndx;
+      Elf_Internal_Sym *sym;
+      asection *sec;
+      struct elf_link_hash_entry *h;
+      bfd_vma relocation;
+
+      /* This is a final link.  */
+      r_symndx = ELF32_R_SYM (rel->r_info);
+      r_type = ELF32_R_TYPE (rel->r_info);
+      h = NULL;
+      sym = NULL;
+      sec = NULL;
+      if (r_symndx < symtab_hdr->sh_info)
+	{
+	  sym = local_syms + r_symndx;
+	  sec = local_sections[r_symndx];
+	  relocation = _bfd_elf_rela_local_sym (output_bfd, sym, &sec, rel);
+	}
+      else
+	{
+	  bfd_boolean unresolved_reloc, warned, ignored;
+
+	  RELOC_FOR_GLOBAL_SYMBOL (info, input_bfd, input_section, rel,
+				   r_symndx, symtab_hdr, sym_hashes,
+				   h, sec, relocation,
+				   unresolved_reloc, warned, ignored);
+	}
+
+      if (sec != NULL && discarded_section (sec))
+	{
+	  /* For relocs against symbols from removed linkonce sections,
+	     or sections discarded by a linker script, we just want the
+	     section contents cleared.  Avoid any special processing.  */
+	  reloc_howto_type *howto;
+	  howto = z80_rtype_to_howto (input_bfd, r_type);
+	  RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
+					   rel, 1, relend, howto, 0, contents);
+	}
+
+      if (bfd_link_relocatable (info))
+	continue;
+
+
+      z80_elf_final_link_relocate (r_type, input_bfd, output_bfd,
+				   input_section,
+				   contents, rel->r_offset,
+				   relocation, rel->r_addend,
+				   info, sec, h == NULL);
+    }
+
+  return TRUE;
 }
 
 /* The final processing done just before writing out a Z80 ELF object
@@ -399,8 +513,8 @@ z80_elf_object_p (bfd *abfd)
     {
       int e_mach = elf_elfheader (abfd)->e_flags & EF_Z80_MACH_MSK;
       switch (e_mach)
-        {
-        default:
+	{
+	default:
 	  _bfd_error_handler (_("%pB: unsupported mach %#x"),
 			      abfd, e_mach);
 	  /* fall through */
@@ -425,7 +539,7 @@ z80_elf_object_p (bfd *abfd)
 	case EF_Z80_MACH_Z80N:
 	  mach = bfd_mach_z80n;
 	  break;
-        }
+	}
     }
   else
     {
@@ -436,13 +550,12 @@ z80_elf_object_p (bfd *abfd)
   return bfd_default_set_arch_mach (abfd, bfd_arch_z80, mach);
 }
 
-
 static int
-z80_is_local_label_name (bfd *        abfd ATTRIBUTE_UNUSED,
-                         const char * name)
+z80_is_local_label_name (bfd *	abfd ATTRIBUTE_UNUSED,
+			 const char * name)
 {
   return (name[0] == '.' && name[1] == 'L') ||
-         _bfd_elf_is_local_label_name (abfd, name);
+	 _bfd_elf_is_local_label_name (abfd, name);
 }
 
 static bfd_reloc_status_type
@@ -457,14 +570,14 @@ z80_elf_16_be_reloc (bfd *abfd,
   bfd_vma val;
   long x;
   bfd_size_type octets = (reloc_entry->address
-                          * OCTETS_PER_BYTE (abfd, input_section));
+			  * OCTETS_PER_BYTE (abfd, input_section));
 
   /* If this is a relocatable link (output_bfd test tells us), just
      call the generic function.  Any adjustment will be done at final
      link time.  */
   if (output_bfd != NULL)
     return bfd_elf_generic_reloc (abfd, reloc_entry, symbol, data,
-                                  input_section, output_bfd, error_message);
+				  input_section, output_bfd, error_message);
 
   /*if (reloc_entry->address > bfd_get_section_limit (abfd, input_section))
     return bfd_reloc_outofrange;*/
@@ -503,14 +616,20 @@ z80_elf_16_be_reloc (bfd *abfd,
 #define TARGET_LITTLE_SYM		z80_elf32_vec
 #define TARGET_LITTLE_NAME		"elf32-z80"
 
+#define elf_backend_can_refcount		1
 #define elf_backend_can_gc_sections		1
 #define elf_backend_stack_align			1
+#define elf_backend_rela_normal			1
 
 #define elf_info_to_howto			z80_info_to_howto_rela
 #define elf_info_to_howto_rel			z80_info_to_howto_rela
+
 #define elf_backend_final_write_processing	z80_elf_final_write_processing
 #define elf_backend_object_p			z80_elf_object_p
-#define bfd_elf32_bfd_is_local_label_name	z80_is_local_label_name
+#define elf_backend_relocate_section		z80_elf_relocate_section
 
+#define bfd_elf32_bfd_reloc_type_lookup		z80_reloc_type_lookup
+#define bfd_elf32_bfd_reloc_name_lookup		z80_reloc_name_lookup
+#define bfd_elf32_bfd_is_local_label_name	z80_is_local_label_name
 
 #include "elf32-target.h"
