@@ -36,6 +36,7 @@
 	jr	nz,.+12
 	ld	hl,0xbeaf
 	ldi	(hl),a
+	ld	(hl+),a
 	inc	hl
 	inc	h
 	dec	h
@@ -44,6 +45,7 @@
 	jr	z,.+12
 	add	hl,hl
 	ldi	a,(hl)
+	ld	a,(hl+)
 	dec	hl
 	inc	l
 	dec	l
@@ -52,6 +54,7 @@
 	jr	nc,.+12
 	ld	sp,0xbeaf
 	ldd	(hl),a
+	ld	(hl-),a
 	inc	sp
 	inc	(hl)
 	dec	(hl)
@@ -60,6 +63,7 @@
 	jr	c,.+12
 	add	hl,sp
 	ldd	a,(hl)
+	ld	a,(hl-)
 	dec	sp
 	inc	a
 	dec	a
@@ -243,7 +247,7 @@
 	rst	0x28
 	ldh	a,(0xfd)
 	pop	af
-	;xx
+	ldh	a,(c)
 	di
 	;xx
 	push	af

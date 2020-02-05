@@ -860,6 +860,22 @@ parse_exp_not_indexed (const char *s, expressionS *op)
     }
 
   op->X_md = indir = is_indir (p);
+  if (indir && (ins_ok & INS_GBZ80))
+    { /* check for instructions like ld a,(hl+), ld (hl-),a */
+      p = skip_space (p+1);
+      if (!strncasecmp (p, "hl", 2))
+	{
+	  p = skip_space(p+2);
+	  if (*skip_space(p+1) == ')' && (*p == '+' || *p == '-'))
+	    {
+	      op->X_op = O_md1;
+	      op->X_add_symbol = NULL;
+	      op->X_add_number = (*p == '+') ? REG_HL : -REG_HL;
+	      input_line_pointer = (char*)skip_space(p + 1) + 1;
+	      return input_line_pointer;
+	    }
+	}
+    }
   input_line_pointer = (char*) s ;
   expression (op);
   switch (op->X_op)
@@ -2113,7 +2129,15 @@ emit_ld_m_r (expressionS *dst, expressionS *src)
   switch (dst->X_op)
     {
     case O_md1:
-      prefix = (dst->X_add_number == REG_IX) ? 0xDD : 0xFD;
+      if (ins_ok & INS_GBZ80)
+	{ /* LD (HL+),A or LD (HL-),A */
+	  if (src->X_op != O_register || src->X_add_number != REG_A)
+	    break;
+	  *frag_more (1) = (dst->X_add_number == REG_HL) ? 0x22 : 0x32;
+	  return;
+	}
+      else
+	prefix = (dst->X_add_number == REG_IX) ? 0xDD : 0xFD;
       /* Fall through.  */
     case O_register:
       switch (dst->X_add_number)
@@ -2267,6 +2291,15 @@ emit_ld_r_m (expressionS *dst, expressionS *src)
   switch (src->X_op)
     {
     case O_md1:
+      if (ins_ok & INS_GBZ80)
+	{ /* LD A,(HL+) or LD A,(HL-) */
+	  if (dst->X_op == O_register && dst->X_add_number == REG_A)
+	    *frag_more (1) = (src->X_add_number == REG_HL) ? 0x2A : 0x3A;
+	  else
+	    ill_op ();
+	  break;
+	}
+      /* Fall through. */
     case O_register:
       if (dst->X_add_number > 7)
         ill_op ();
@@ -2721,12 +2754,18 @@ emit_ldh (char prefix ATTRIBUTE_UNUSED, char opcode ATTRIBUTE_UNUSED,
       && dst.X_op == O_register
       && dst.X_add_number == REG_A
       && src.X_md != 0
-      && src.X_op != O_md1
-      && src.X_op != O_register)
+      && src.X_op != O_md1)
     {
-      q = frag_more (1);
-      *q = 0xF0;
-      emit_byte (& src, BFD_RELOC_8);
+      if (src.X_op != O_register)
+	{
+	  q = frag_more (1);
+	  *q = 0xF0;
+	  emit_byte (& src, BFD_RELOC_8);
+	}
+      else if (src.X_add_number == REG_C)
+	*frag_more (1) = 0xF2;
+      else
+	ill_op ();
     }
   else if (dst.X_md != 0
       && dst.X_op != O_md1

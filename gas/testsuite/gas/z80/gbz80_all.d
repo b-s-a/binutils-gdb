@@ -41,31 +41,35 @@ Disassembly of section .text:
 \s+[0-9a-f]+:\s+1f\s+rra
 \s+[0-9a-f]+:\s+20 0a\s+jr nz,0x0037
 \s+[0-9a-f]+:\s+21 af be\s+ld hl,0xbeaf
-\s+[0-9a-f]+:\s+22\s+ldi \(hl\),a
+\s+[0-9a-f]+:\s+22\s+ld \(hl\+\),a
+\s+[0-9a-f]+:\s+22\s+ld \(hl\+\),a
 \s+[0-9a-f]+:\s+23\s+inc hl
 \s+[0-9a-f]+:\s+24\s+inc h
 \s+[0-9a-f]+:\s+25\s+dec h
 \s+[0-9a-f]+:\s+26 fd\s+ld h,0xfd
 \s+[0-9a-f]+:\s+27\s+daa
-\s+[0-9a-f]+:\s+28 0a\s+jr z,0x0043
+\s+[0-9a-f]+:\s+28 0a\s+jr z,0x0044
 \s+[0-9a-f]+:\s+29\s+add hl,hl
-\s+[0-9a-f]+:\s+2a\s+ldi a,\(hl\)
+\s+[0-9a-f]+:\s+2a\s+ld a,\(hl\+\)
+\s+[0-9a-f]+:\s+2a\s+ld a,\(hl\+\)
 \s+[0-9a-f]+:\s+2b\s+dec hl
 \s+[0-9a-f]+:\s+2c\s+inc l
 \s+[0-9a-f]+:\s+2d\s+dec l
 \s+[0-9a-f]+:\s+2e fd\s+ld l,0xfd
 \s+[0-9a-f]+:\s+2f\s+cpl
-\s+[0-9a-f]+:\s+30 0a\s+jr nc,0x004d
+\s+[0-9a-f]+:\s+30 0a\s+jr nc,0x004f
 \s+[0-9a-f]+:\s+31 af be\s+ld sp,0xbeaf
-\s+[0-9a-f]+:\s+32\s+ldd \(hl\),a
+\s+[0-9a-f]+:\s+32\s+ld \(hl-\),a
+\s+[0-9a-f]+:\s+32\s+ld \(hl-\),a
 \s+[0-9a-f]+:\s+33\s+inc sp
 \s+[0-9a-f]+:\s+34\s+inc \(hl\)
 \s+[0-9a-f]+:\s+35\s+dec \(hl\)
 \s+[0-9a-f]+:\s+36 fd\s+ld \(hl\),0xfd
 \s+[0-9a-f]+:\s+37\s+scf
-\s+[0-9a-f]+:\s+38 0a\s+jr c,0x0059
+\s+[0-9a-f]+:\s+38 0a\s+jr c,0x005c
 \s+[0-9a-f]+:\s+39\s+add hl,sp
-\s+[0-9a-f]+:\s+3a\s+ldd a,\(hl\)
+\s+[0-9a-f]+:\s+3a\s+ld a,\(hl-\)
+\s+[0-9a-f]+:\s+3a\s+ld a,\(hl-\)
 \s+[0-9a-f]+:\s+3b\s+dec sp
 \s+[0-9a-f]+:\s+3c\s+inc a
 \s+[0-9a-f]+:\s+3d\s+dec a
@@ -241,6 +245,7 @@ Disassembly of section .text:
 \s+[0-9a-f]+:\s+ef\s+rst 0x28
 \s+[0-9a-f]+:\s+f0 fd\s+ldh a,\(0xfd\)
 \s+[0-9a-f]+:\s+f1\s+pop af
+\s+[0-9a-f]+:\s+f2\s+ldh a,\(c\)
 \s+[0-9a-f]+:\s+f3\s+di
 \s+[0-9a-f]+:\s+f5\s+push af
 \s+[0-9a-f]+:\s+f6 fd\s+or 0xfd
