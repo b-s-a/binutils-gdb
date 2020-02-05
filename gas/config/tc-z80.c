@@ -3563,17 +3563,17 @@ md_assemble (char *str)
       insp = bsearch (&key, instab, ARRAY_SIZE (instab),
 		    sizeof (instab[0]), key_cmp);
       if (!insp || (insp->inss && !(insp->inss & ins_ok)))
-        {
-          as_bad (_("Unknown instruction '%s'"), buf);
-          *frag_more (1) = 0;
-        }
+	{
+	  *frag_more (1) = 0;
+	  as_bad (_("Unknown instruction `%s'"), buf);
+	}
       else
 	{
 	  p = insp->fp (insp->prefix, insp->opcode, p);
 	  p = skip_space (p);
-	if ((!err_flag) && *p)
-	  as_bad (_("junk at end of line, first unrecognized character is `%c'"),
-		  *p);
+	  if ((!err_flag) && *p)
+	    as_bad (_("junk at end of line, "
+		      "first unrecognized character is `%c'"), *p);
 	}
     }
 end:
@@ -3998,6 +3998,7 @@ str_to_ieee754_d(char *litP, int *sizeP)
   return ieee_md_atof ('d', litP, sizeP, FALSE);
 }
 
+#ifdef TARGET_USE_CFIPOP
 /* Initialize the DWARF-2 unwind information for this procedure. */
 void
 z80_tc_frame_initial_instructions (void)
@@ -4016,9 +4017,9 @@ z80_tc_regname_to_dw2regnum (const char *regname)
   static const char *regs[] =
     { /* same registers as for GDB */
       "af", "bc", "de", "hl",
-      "ix", "iy", "sp", "pc",
+      "sp", "pc", "ix", "iy",
       "af_", "bc_", "de_", "hl_",
-      "ir", "mbst" /* MB - eZ80 register, ST: bit0 - iff1, bit1 - iff2, bit2 - ADL, bit3 - MADL */
+      "ir"
     };
   unsigned i;
 
@@ -4027,4 +4028,18 @@ z80_tc_regname_to_dw2regnum (const char *regname)
       return i;
 
   return -1;
+}
+#endif
+
+/* Implement DWARF2_ADDR_SIZE.  */
+int
+z80_dwarf2_addr_size (const bfd *abfd)
+{
+  switch (bfd_get_mach (abfd))
+    {
+    case bfd_mach_ez80_adl:
+      return 3;
+    default:
+      return 2;
+    }
 }
