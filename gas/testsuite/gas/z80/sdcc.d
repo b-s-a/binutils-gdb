@@ -1,5 +1,5 @@
 #name: SDCC compatibility mode
-#source: sdcc.s -z80 -sdcc
+#as: -sdcc
 #objdump: -d -j _CODE
 
 .*:[     ]+file format (coff)|(elf32)\-z80

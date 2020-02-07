@@ -123,7 +123,7 @@ extern void z80_elf_final_processing (void);
 #define DWARF2_CIE_DATA_ALIGNMENT	-1
 
 /* We want .cfi_* pseudo-ops for generating unwind info.  */
-//#define TARGET_USE_CFIPOP		1
+/*#define TARGET_USE_CFIPOP		1*/
 
 /* Z80 instructions are 1 or 4 bytes long.  */
 #define DWARF2_LINE_MIN_INSN_LENGTH	1
