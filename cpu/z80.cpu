@@ -1,0 +1,447 @@
+; Zilog Z80 instructions. -*- Scheme -*-
+; Copyright (C) 2020 Sergey Belyashov
+; This file is part of CGEN
+; See file COPYING.CGEN for details.
+
+;(define-rtl-version 1 1)
+
+(include "simplify.inc")
+
+(define-arch
+  (name z80) ; name of cpu family
+  (comment "Z80 and derivatives")
+  (default-alignment unaligned)
+  (insn-lsb0? #t)
+  (machs z80) ; z180 ez80_z80 ez80_adl gbz80 z80n
+  (isas z80) ; z180 ez80_z80 ez80_adl gbz80 z80n
+)
+
+; Attributes.
+
+; Instruction set parameters.
+
+(define-isa
+  (name z80)
+  (comment "Default Z80 ISA")
+  ;(attrs attribute-list)
+  (default-insn-word-bitsize 8) ; Used in computing bit numbers.
+  (default-insn-bitsize 8) ; The minimum size of an instruction
+  (base-insn-bitsize 8) ; Number of bytes of insn we can initially fetch.
+  ;(decode-assist (7 6)) ; Initial bitnumbers to decode insns by.
+  ;(liw-insns 1) ; The number of instructions the CPU always fetches at once.
+  ;(parallel-insns 1)
+  ;(decode-splits )
+)
+
+; Cpu family definitions.
+
+(define-cpu
+  ; cpu names must be distinct from the architecture name and machine names.
+  ; The "b" suffix stands for "base" and is the convention.
+  ; The "f" suffix stands for "family" and is the convention.
+  (name z80bf)
+  (comment "Z80 base family")
+  ;(attrs attribute-list)
+  (endian little)
+  (word-bitsize 8)
+)
+
+(define-mach
+  (name z80)
+  (comment "Zilog Z80")
+  (cpu z80bf)
+  (bfd-name "bfd_mach_z80")
+  (isas z80)
+)
+
+(define-model
+  (name z80)
+  (comment "Z80 model")
+  (mach z80)
+  (unit u-exec "Execution Unit" ()
+        1 1 ; issue done
+        () ; state
+        () ; inputs
+        () ; outputs
+        () ; profile action (default)
+        )
+)
+
+(define-pmacro all-isas () (ISA z80))
+
+;
+; Hardware declarations
+;
+
+(dnh h-pc "program counter" (PC) (pc) () () ())
+
+(dnh h-mr "main set 16-bit register pairs"
+  (all-isas)
+  (register HI (4))
+  (keyword "" (("bc" 0) ("de" 1) ("hl" 2) ("af" 3)))
+  () ()
+)
+
+(dnh h-ar "alternate set 16-bit register pairs"
+  (all-isas)
+     (register HI (4))
+     (keyword "" (("bc'" 4) ("de'" 5) ("hl'" 6) ("af'" 7)))
+     () ()
+)
+
+(dnh h-xy "index 16-bit registers"
+  (all-isas)
+     (register HI (2))
+     (keyword "" (("ix" #x22) ("iy" #x32)))
+     () ()
+)
+
+(dnh h-sp "stack pointer register"
+  (all-isas)
+     (register HI (1))
+     (keyword "" (("sp" #x13)))
+     ();(get () (c-call HI "h_sp_get_handler"))
+     ();(set (newval) (c-call VOID "h_sp_set_handler" newval))
+)
+
+(dnh h-rr "R-register"
+  (all-isas)
+     (register QI (1))
+     (keyword "" ((r 1)))
+     () ()
+)
+
+(dnh h-ri "I-register"
+  (all-isas)
+     (register QI (1))
+     (keyword "" ((i 1)))
+     () ()
+)
+
+(dsh h-iff1 "interrupt enable flag 1"	() (register BI))
+(dsh h-iff2 "interrupt enable flag 2"	() (register BI))
+
+; Virtual hardware declarations
+
+(define-hardware
+  (name h-mr8)
+  (comment "8-bit main registers")
+  (attrs all-isas VIRTUAL)
+  (type register QI (8))
+  (indices keyword "" (("b" 0) ("c" 1) ("d" 2) ("e" 3) ("h" 4) ("l" 5) ("a" 7)))
+  ;(values)
+  (get (index) (and (if SI (mod index 2)
+			   (reg h-mr (div index 2))
+			   (srl (reg h-mr (div index 2)) 8))
+			   #xff))
+  (set (index newval) (set (reg h-mr (div index 2))
+			   (if SI (mod index 2)
+				  (or (and (reg h-mr (div index 2)) #xff00)
+				      (and newval #xff))
+				  (or (and (reg h-mr (div index 2)) #xff)
+				      (sll (and newval #xff) 8)))))
+)
+
+(define-hardware
+  (name h-xy8)
+  (comment "index register halves")
+  (attrs all-isas VIRTUAL)
+  (type register QI (4))
+  (indices keyword "" (("ixh" #x24) ("ixl" #x25) ("iyh" #x34) ("iyl" #x35)))
+  ;(values)
+  (get (index) (and (if SI (mod index 2)
+			   (reg h-mr (div index 2))
+			   (srl (reg h-mr (div index 2)) 8))
+			   #xff))
+  (set (index newval) (set (reg h-mr (div index 2))
+			      (if SI (mod index 2)
+				  (or (and (reg h-mr (div index 2)) #xff00)
+				      (and newval #xff))
+				  (or (and (reg h-mr (div index 2)) #xff)
+				      (sll (and newval #xff) 8)))))
+)
+
+(define-hardware
+  (name h-ss)
+  (comment "register pairs used in arithmetic operations")
+  (attrs all-isas VIRTUAL)
+  (type register HI (4))
+  (indices keyword "" (("bc" 0) ("de" 1) ("hl" 2) ("sp" 3)))
+  ;(values)
+  (get (index) (and 0 0)) ;TODO: implement me
+  (set (index newval) (set (reg h-mr (div index 2)) 0))
+)
+
+(define-hardware
+  (name h-qq)
+  (comment "register pairs used for push/pop")
+  (attrs all-isas VIRTUAL)
+  (type register HI (4))
+  (indices keyword "" (("bc" 0) ("de" 1) ("hl" 2) ("af" 3)))
+  ;(values)
+  (get (index) (and 0 0)) ;TODO: implement me
+  (set (index newval) (set (reg h-mr (div index 2)) 0))
+)
+
+;(dsh h-cf "carry flag"			() (register BI))
+;(dsh h-nf "subtract operation flag"	() (register BI))
+;(dsh h-pvf "parity/overflow flag"	() (register BI))
+;(dsh h-3f "bit 3 of flags register"	() (register BI))
+;(dsh h-hf "half carry flag"		() (register BI))
+;(dsh h-5f "bit 5 of flags register"	() (register BI))
+;(dsh h-zf "zero flag"			() (register BI))
+;(dsh h-sf "sign flag"			() (register BI))
+
+
+(define-hardware
+  (name h-cc)
+  (comment "condition code hardware for Z80")
+  (attrs all-isas)
+  (type immediate UQI)
+  (values keyword ""
+	  (("nc" 0)
+	   ("c"  1)
+	   ("nz" 2)
+           ("z"  3)
+	   ("po" 4)
+	   ("pe" 5)
+	   ("p"  6)
+	   ("m"  7)
+	  )
+  )
+)
+
+(define-hardware
+  (name h-rot)
+  (comment "Rotation operations")
+  (attrs all-isas)
+  (type immediate UQI)
+  (values keyword ""
+	  (("rlc" 0)
+	   ("rrc" 1)
+	   ("rl"  2)
+           ("rr"  3)
+           ("sla" 4)
+           ("sra" 5)
+           ("sll" 6)
+           ("srl" 7)
+	  )
+  )
+)
+
+(define-hardware
+  (name h-rst)
+  (comment "RST addresses")
+  (attrs all-isas)
+  (type immediate UQI)
+  (values keyword ""
+	  (("0x00" 0)
+	   ("0x08" 1)
+	   ("0x10" 2)
+           ("0x18" 3)
+           ("0x20" 4)
+           ("0x28" 5)
+           ("0x30" 6)
+           ("0x38" 7)
+	  )
+  )
+)
+
+;
+; Fields declaration:
+;
+; Main table
+;
+;  7  6  5  4  3  2  1  0     15       8 23      16
+;+------+--------+--------+  +----------+----------+
+;|   x  |    y   |    z   |  |   imm8   |   imm8   |
+;+------+--------+--------+  +----------+----------+
+;
+;  7  6  5  4  3  2  1  0     15       8
+;+------+---+----+--------+  +----------+
+;|   x  | r |  s |    z   |  |   imm8   |
+;+------+---+----+--------+  +----------+
+;
+;  7  6  5  4  3  2  1  0     23                  8
+;+------+----+---+--------+  +----------+----------+
+;|   x  |  p | q |    z   |  |         imm16       |
+;+------+----+---+--------+  +----------+----------+
+;
+;  CB table
+;
+; 7                      0    15 14 13    11 10     8
+;+------------------------+ +------+--------+--------+
+;|         #xCB           | |   x  |    y   |    z   |
+;+------------------------+ +------+--------+--------+
+;
+;  ED table
+;
+; 7                      0    7  6  5  4  3  2  1  0     15       8 
+;+------------------------+ +------+--------+--------+  +----------+
+;|         #xED           | |   x  |    y   |    z   |  |   imm8   |
+;+------------------------+ +------+--------+--------+  +----------+
+;
+; 7                      0    7  6  5  4  3  2  1  0     23                  8
+;+------------------------+ +------+----+---+--------+  +----------+----------+
+;|         #xED           | |   x  |  p | q |    z   |  |         imm16       |
+;+------------------------+ +------+----+---+--------+  +----------+----------+
+;
+
+(dnf f-b "whole 1st byte" ((MACH z80) all-isas) 7 8)
+(dnf f-x "field x, bits 7-6" ((MACH z80) all-isas) 7 2)
+(dnf f-y "field y, bits 5-3" ((MACH z80) all-isas) 5 3)
+(dnf f-z "field z, bits 2-0" ((MACH z80) all-isas) 2 3)
+(dnf f-p "field p, bits 5-4" ((MACH z80) all-isas) 5 2)
+(dnf f-q "field q, bit 3"    ((MACH z80) all-isas) 3 1)
+(dnf f-r "field r, bit 5"    ((MACH z80) all-isas) 5 1)
+(dnf f-s "field s, bits 4-3" ((MACH z80) all-isas) 4 2)
+
+(dnf f-i-15-8 "signed 8-bit immediate" ((MACH z80) all-isas) 15 8)
+(dnf f-u-15-8 "unsigned 8-bit immediate" ((MACH z80) all-isas) 15 8)
+(dnf f-u-23-16 "unsigned 16-bit immediate" ((MACH z80) all-isas) 23 16)
+
+; Operands declaration
+;
+(dnop od  "signed immediate 8-bit after first word"    () h-uint f-i-15-8)
+(dnop on  "unsigned immediate 8-bit after first word"  () h-uint f-u-15-8)
+(dnop nn  "unsigned immediate 16-bit after first word" () h-uint f-u-23-16)
+(dnop oc  "reduced set of conditions"                  () h-cc f-s)
+(dnop cc  "set of conditions"                          () h-cc f-y)
+(dnop ss  "register pair BC, DE, HL, SP"               () h-ss  f-p)
+(dnop qq  "register pair BC, DE, HL, AF"               () h-qq  f-p)
+(dnop rd  "register B, C, D, E, H, L, A"               () h-mr8 f-y)
+(dnop rs  "register B, C, D, E, H, L, A"               () h-mr8 f-z)
+;(dnop alu "ALU operation"                              () h-alu8 f-y)
+(dnop rn  "RST immediate"                              () h-rst f-y)
+;(dnop ra  "register A"                                 () h-ra f-nil) 
+;(dnop rh  "register HL"                                () h-rh f-nil) 
+;
+; Instructions declaration
+;
+
+(define-pmacro (d8i name attrs fz)
+  (begin
+    (dni (.sym name -mhl) (.str "operation " name " (hl)") attrs
+         (.str name " (hl)")
+         (+ (f-x 0) (f-y 6) (f-z fz))
+         ()
+         ()
+    )
+    (dni (.sym name -r) (.str "operation " name " r") attrs
+         (.str name " $rd")
+         (+ (f-x 0) rd (f-z fz))
+         ()
+         ()
+    )
+  )
+)
+
+(define-pmacro (dalu8i name attrs fy x-rd)
+  (begin 
+    (dni (.sym name -a-mhl) (.str "operation " name " " x-rd "(hl)") attrs
+         (.str name " " x-rd "(hl)")
+         (+ (f-x 2) (f-y fy) (f-z 6))
+         ()
+         ()
+    )
+    (dni (.sym name -a-r) (.str "operation " name " " x-rd "r") attrs
+         (.str name " " x-rd "$rs")
+         (+ (f-x 2) (f-y fy) rs)
+         ()
+         ()
+    )
+    (dni (.sym name -a-n) (.str "operation " name " " x-rd "n") attrs
+         (.str name " " x-rd "$on")
+         (+ (f-x 3) (f-y fy) (f-z 6) on)
+         ()
+         ()
+    )
+  )
+)
+
+(dni nop        "nop operation" (all-isas) "nop" (+ (f-x 0) (f-y 0) (f-z 0)) (nop) ())
+
+(dni ex-af-af   "exchange AF with AF'" (all-isas) "ex af,af`" (+ (f-x 0) (f-y 1) (f-z 0)) () ())
+
+(dni djnz-d     "decrease B and relative jump" (all-isas) "djnz $od" (+ (f-x 0) (f-y 2) (f-z 0) od) () ()) ;FIXME
+
+(dni jr-d       "relative jump" (all-isas) "jr $od" (+ (f-x 0) (f-y 3) (f-z 0) od) () ()) ;FIXME
+
+(dni jr-cc-d    "conditional relative jump" (all-isas) "jr $oc,$od" (+ (f-x 0) (f-r 1) oc (f-z 0) od) () ()) ;FIXME
+
+(dni ld-ss-nn   "load immediate value to register pair" (all-isas) "ld $ss,$nn" (+ (f-x 0) ss (f-q 0) (f-z 1) nn) () ())
+
+(dni add-hl-ss  "add register pair to HL" (all-isas) "add hl,$ss" (+ (f-x 0) ss (f-q 1) (f-z 1)) () ())
+
+(dni ld-mbc-a   "store A to memory addressed by BC" (all-isas) "ld (bc),a" (+ (f-x 0) (f-p 0) (f-q 0) (f-z 2)) () ())
+
+(dni ld-mde-a   "store A to memory addressed by DE" (all-isas) "ld (de),a" (+ (f-x 0) (f-p 1) (f-q 0) (f-z 2)) () ())
+
+(dni ld-a-mbc   "load A from memory addressed by BC" (all-isas) "ld a,(bc)" (+ (f-x 0) (f-p 0) (f-q 1) (f-z 2)) () ())
+
+(dni ld-a-mde   "load A from memory addressed by DE" (all-isas) "ld a,(de)" (+ (f-x 0) (f-p 1) (f-q 1) (f-z 2)) () ())
+
+(dni ld-mnn-hl  "store HL to memory addressed by immediate" (all-isas) "ld ($nn),hl" (+ (f-x 0) (f-p 2) (f-q 0) (f-z 2) nn) () ())
+
+(dni ld-mnn-a   "store A to memory addressed by immediate" (all-isas) "ld ($nn),a" (+ (f-x 0) (f-p 3) (f-q 0) (f-z 2) nn) () ())
+
+(dni ld-hl-mnn  "load HL from memory addressed by immediate" (all-isas) "ld hl,($nn)" (+ (f-x 0) (f-p 2) (f-q 1) (f-z 2) nn) () ())
+
+(dni ld-a-mnn   "load A from memory addressed by immediate" (all-isas) "ld a,($nn)" (+ (f-x 0) (f-p 3) (f-q 1) (f-z 2) nn) () ())
+
+(dni inc-ss     "increment register pair" (all-isas) "inc $ss" (+ (f-x 0) ss (f-q 0) (f-z 3)) () ())
+(dni dec-ss     "decrement register pair" (all-isas) "dec $ss" (+ (f-x 0) ss (f-q 1) (f-z 3)) () ())
+
+(d8i inc (all-isas) 4)
+(d8i dec (all-isas) 5)
+;(dni inc-mhl    "8-bit increment memory addressed by HL" (all-isas) "inc (hl)" (+ (f-x 0) (f-y 6) (f-z 4)) () ())
+;(dni inc-r      "increment register" (all-isas) "inc $rd" (+ (f-x 0) rd (f-z 4)) () ())
+
+;(dni dec-mhl    "8-bit decrement memory addressed by HL" (all-isas) "dec (hl)" (+ (f-x 0) (f-y 6) (f-z 5)) () ())
+;(dni dec-r      "decrement register" (all-isas) "dec $rd" (+ (f-x 0) rd  (f-z 5)) () ())
+
+(dni ld-mhl-n   "load immediate to memory addressed by HL" (all-isas) "ld (hl),$on" (+ (f-x 0) (f-y 6) (f-z 6) on) () ())
+(dni ld-r-n     "load immediate to register" (all-isas) "ld $rd,$on" (+ (f-x 0) rd (f-z 6) on) () ())
+
+(dni rlca       "cyclic rotate left A" (all-isas) "rlca" (+ (f-x 0) (f-y 0) (f-z 7)) () ())
+(dni rrca       "cyclic rotate right A" (all-isas) "rrca" (+ (f-x 0) (f-y 1) (f-z 7)) () ())
+(dni rla        "rotate left A" (all-isas) "rla" (+ (f-x 0) (f-y 2) (f-z 7)) () ())
+(dni rra        "rotate right A" (all-isas) "rra" (+ (f-x 0) (f-y 3) (f-z 7)) () ())
+(dni daa        "BCD arithmetic adjust" (all-isas) "daa" (+ (f-x 0) (f-y 4) (f-z 7)) () ())
+(dni cpl        "inverse A" (all-isas) "cpl" (+ (f-x 0) (f-y 5) (f-z 7)) () ())
+(dni scf        "set carry flag" (all-isas) "scf" (+ (f-x 0) (f-y 6) (f-z 7)) () ())
+(dni ccf        "inverse carry flag" (all-isas) "ccf" (+ (f-x 0) (f-y 7) (f-z 7)) () ())
+
+(dni halt       "halt the CPU" (all-isas) "halt" (+ (f-x 1) (f-y 6) (f-z 6)) () ())
+(dni ld-r-mhl   "load register rd from (hl)" (all-isas) "ld $rd,(hl)" (+ (f-x 1) rd (f-z 6)) () ())
+(dni ld-mhl-r   "store register rs to (hl)" (all-isas) "ld (hl),$rs" (+ (f-x 1) (f-y 6) rs) () ())
+(dni ld-r-r     "load register rd by rs" (all-isas) "ld $rd,$rs" (+ (f-x 1) rd rs) () ())
+
+(dalu8i add (all-isas) 0 "a,")
+(dalu8i adc (all-isas) 1 "a,")
+(dalu8i sub (all-isas) 2 "")
+(dalu8i sbc (all-isas) 3 "a,")
+(dalu8i and (all-isas) 4 "")
+(dalu8i xor (all-isas) 5 "")
+(dalu8i or  (all-isas) 6 "")
+(dalu8i cp  (all-isas) 7 "")
+
+(dni ret-cc     "conditional return" (all-isas) "ret $cc" (+ (f-x 3) cc (f-z 0)) () ())
+(dni pop-qq     "pop register pair" (all-isas) "pop $qq" (+ (f-x 3) qq (f-q 0) (f-z 1)) () ())
+(dni ret        "return" (all-isas) "ret" (+ (f-x 3) (f-p 0) (f-q 1) (f-z 1)) () ())
+(dni exx        "exx" (all-isas) "exx" (+ (f-x 3) (f-p 1) (f-q 1) (f-z 1)) () ())
+(dni jp-hl      "indirect jump to HL" (all-isas) "jp (hl)" (+ (f-x 3) (f-p 2) (f-q 1) (f-z 1)) () ())
+(dni ld-sp-hl   "load HL value to SP" (all-isas) "ld sp,hl" (+ (f-x 3) (f-p 3) (f-q 1) (f-z 1)) () ())
+(dni jp-cc-nn   "conditional jump" (all-isas) "jp $cc,$nn" (+ (f-x 3) cc (f-z 2) nn) () ())
+(dni jp-nn      "jump to immediate address" (all-isas) "jp $nn" (+ (f-x 3) (f-y 0) (f-z 3) nn) () ())
+(dni out-mn-a   "write A to port n" (all-isas) "out ($on),a" (+ (f-x 3) (f-y 0) (f-z 3) on) () ())
+(dni in-a-mn    "read from port n to A" (all-isas) "in a,($on)" (+ (f-x 3) (f-y 3) (f-z 3) on) () ())
+(dni ex-msp-hl  "exchange HL with stack top" (all-isas) "ex sp,hl" (+ (f-x 3) (f-y 4) (f-z 3)) () ())
+(dni ex-de-hl   "exchange HL with DE" (all-isas) "ex de,hl" (+ (f-x 3) (f-y 5) (f-z 3)) () ())
+(dni di         "disable interrupts" (all-isas) "di" (+ (f-x 3) (f-y 6) (f-z 3)) () ())
+(dni ei         "enable interrupts" (all-isas) "ei" (+ (f-x 3) (f-y 7) (f-z 3)) () ())
+(dni call-cc-nn "conditional call" (all-isas) "call $cc,$nn" (+ (f-x 3) cc (f-z 4) nn) () ())
+(dni push-qq    "push register pair" (all-isas) "push $qq" (+ (f-x 3) qq (f-q 0) (f-z 5)) () ())
+(dni call-nn    "call to immediate address" (all-isas) "call $nn" (+ (f-x 3) (f-p 0) (f-q 1) (f-z 5) nn) () ())
+(dni rst-n      "restart from (call) address n" (all-isas) "rst $rn" (+ (f-x 3) rn (f-z 6)) () ())
+
