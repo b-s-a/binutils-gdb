@@ -46,7 +46,7 @@
 #define CGEN_DIS_HASH(buf,value) (((* (unsigned char*) (buf)) >> 6) % CGEN_DIS_HASH_SIZE)
 
 /* -- asm.c */
-
+/*
 static const char *
 parse_fsd (CGEN_CPU_DESC cd,
 	   const char ** strp,
@@ -55,9 +55,9 @@ parse_fsd (CGEN_CPU_DESC cd,
 {
   abort ();
 }
-
+*/
 /* -- dis.c */
-
+/*
 static void
 print_likely (CGEN_CPU_DESC cd,
 	      void * dis_info,
@@ -70,5 +70,10 @@ print_likely (CGEN_CPU_DESC cd,
 
   (*info->fprintf_func) (info->stream, (value) ? "/l" : "/u");
 }
-
+*/
+//#define CGEN_PRINT_NORMAL(cd, info, value, attrs, pc, length)
+//#define CGEN_PRINT_ADDRESS(cd, info, value, attrs, pc, length)
+//#define CGEN_PRINT_INSN function_name
+#define CGEN_BFD_ARCH bfd_arch_z80
+//#define CGEN_COMPUTE_ISA(info)
 /* -- */

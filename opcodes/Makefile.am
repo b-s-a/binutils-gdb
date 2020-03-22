@@ -83,6 +83,7 @@ HFILES = \
 	sysdep.h \
 	xc16x-desc.h xc16x-opc.h \
 	xstormy16-desc.h xstormy16-opc.h \
+	z80-desc.h z80-opc.h \
 	z8k-opc.h
 
 # C source files that correspond to .o's ending up in libopcodes
@@ -269,6 +270,8 @@ TARGET_LIBOPCODES_CFILES = \
 	xgate-dis.c \
 	xgate-opc.c \
 	z80-dis.c \
+	z80-ibld.c \
+	z80-opc.c \
 	z8k-dis.c
 
 # C source files that correspond to .o's ending up in libopcodes.
@@ -355,7 +358,7 @@ po/POTFILES.in: @MAINT@ Makefile
 CLEANFILES = \
 	stamp-epiphany stamp-fr30 stamp-frv stamp-ip2k stamp-iq2000 stamp-lm32 \
 	stamp-m32c stamp-m32r stamp-mep stamp-mt \
-	stamp-or1k stamp-xc16x stamp-xstormy16 \
+	stamp-or1k stamp-xc16x stamp-xstormy16 stamp-z80 \
 	libopcodes.a stamp-lib
 
 
@@ -371,7 +374,7 @@ CGENDEPS = \
 	$(CGENDIR)/opc-opinst.scm \
 	cgen-asm.in cgen-dis.in cgen-ibld.in
 
-CGEN_CPUS = epiphany fr30 frv ip2k iq2000 lm32 m32c m32r mep mt or1k xc16x xstormy16
+CGEN_CPUS = epiphany fr30 frv ip2k iq2000 lm32 m32c m32r mep mt or1k xc16x xstormy16 z80
 
 if CGEN_MAINT
 BPF_DEPS = stamp-bpf
@@ -388,6 +391,7 @@ MT_DEPS = stamp-mt
 OR1K_DEPS = stamp-or1k
 XC16X_DEPS = stamp-xc16x
 XSTORMY16_DEPS = stamp-xstormy16
+Z80_DEPS = stamp-z80
 else
 BPF_DEPS =
 EPIPHANY_DEPS =
@@ -403,6 +407,7 @@ MT_DEPS =
 OR1K_DEPS =
 XC16X_DEPS =
 XSTORMY16_DEPS =
+Z80_DEPS =
 endif
 
 run-cgen:
@@ -522,6 +527,14 @@ $(srcdir)/xstormy16-desc.h $(srcdir)/xstormy16-desc.c $(srcdir)/xstormy16-opc.h 
 stamp-xstormy16: $(CGENDEPS) $(CPUDIR)/xstormy16.cpu $(CPUDIR)/xstormy16.opc
 	$(MAKE) run-cgen arch=xstormy16 prefix=xstormy16 options= \
 		archfile=$(CPUDIR)/xstormy16.cpu opcfile=$(CPUDIR)/xstormy16.opc extrafiles=
+
+$(srcdir)/z80-desc.h $(srcdir)/z80-desc.c $(srcdir)/z80-opc.h $(srcdir)/z80-opc.c $(srcdir)/z80-ibld.c $(srcdir)/z80-asm.c $(srcdir)/z80-dis.c: $(Z80_DEPS)
+	@true
+stamp-z80: $(CGENDEPS) $(CPUDIR)/z80.cpu $(CPUDIR)/z80.opc
+	$(MAKE) run-cgen arch=z80 prefix=z80 options= \
+		archfile=$(CPUDIR)/z80.cpu \
+		opcfile=$(CPUDIR)/z80.opc \
+		extrafiles=
 
 MOSTLYCLEANFILES = aarch64-gen$(EXEEXT_FOR_BUILD) i386-gen$(EXEEXT_FOR_BUILD) \
 	ia64-gen$(EXEEXT_FOR_BUILD) s390-mkopc$(EXEEXT_FOR_BUILD) s390-opc.tab \
