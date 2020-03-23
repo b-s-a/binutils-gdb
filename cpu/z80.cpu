@@ -39,7 +39,7 @@
   ; cpu names must be distinct from the architecture name and machine names.
   ; The "b" suffix stands for "base" and is the convention.
   ; The "f" suffix stands for "family" and is the convention.
-  (name z80bf)
+  (name z80)
   (comment "Z80 base family")
   ;(attrs attribute-list)
   (endian little)
@@ -49,7 +49,7 @@
 (define-mach
   (name z80)
   (comment "Zilog Z80")
-  (cpu z80bf)
+  (cpu z80)
   (bfd-name "bfd_mach_z80")
   (isas z80)
 )
@@ -59,12 +59,12 @@
   (comment "Z80 model")
   (mach z80)
   (unit u-exec "Execution Unit" ()
-        1 1 ; issue done
-        () ; state
-        () ; inputs
-        () ; outputs
-        () ; profile action (default)
-        )
+	1 1 ; issue done
+	() ; state
+	() ; inputs
+	() ; outputs
+	() ; profile action (default)
+	)
 )
 
 (define-pmacro all-isas () (ISA z80))
@@ -202,7 +202,7 @@
 	  (("nc" 0)
 	   ("c"  1)
 	   ("nz" 2)
-           ("z"  3)
+	   ("z"  3)
 	   ("po" 4)
 	   ("pe" 5)
 	   ("p"  6)
@@ -220,31 +220,31 @@
 	  (("rlc" 0)
 	   ("rrc" 1)
 	   ("rl"  2)
-           ("rr"  3)
-           ("sla" 4)
-           ("sra" 5)
-           ("sll" 6)
-           ("srl" 7)
+	   ("rr"  3)
+	   ("sla" 4)
+	   ("sra" 5)
+	   ("sll" 6)
+	   ("srl" 7)
 	  )
   )
 )
 
-(define-hardware
-  (name h-rst)
-  (comment "RST addresses")
-  (attrs all-isas)
-  (type immediate UQI)
-  (values keyword ""
-	  (("0x00" 0)
-	   ("0x08" 1)
-	   ("0x10" 2)
-           ("0x18" 3)
-           ("0x20" 4)
-           ("0x28" 5)
-           ("0x30" 6)
-           ("0x38" 7)
-	  )
-  )
+(define-pmacro (dwf x-name x-comment x-attrs
+                    x-word-offset x-word-length x-start x-length
+                    x-mode x-encode x-decode)
+  "Define a field including its containing word."
+  (define-ifield
+   (name x-name)
+    (comment x-comment)
+    (.splice attrs (.unsplice x-attrs))
+    (word-offset x-word-offset)
+    (word-length x-word-length)
+    (start x-start)
+    (length x-length)
+    (mode x-mode)
+    (.splice encode (.unsplice x-encode))
+    (.splice decode (.unsplice x-decode))
+    )
 )
 
 ;
@@ -267,7 +267,7 @@
 ;|   x  |  p | q |    z   |  |         imm16       |
 ;+------+----+---+--------+  +----------+----------+
 
-(dnf f-b "whole byte 0" ((MACH z80) all-isas) 7 8)
+(dnf f-0 "whole byte 0" ((MACH z80) all-isas) 7 8)
 (dnf f-x "field x, bits 7-6" ((MACH z80) all-isas) 7 2)
 (dnf f-y "field y, bits 5-3" ((MACH z80) all-isas) 5 3)
 (dnf f-z "field z, bits 2-0" ((MACH z80) all-isas) 2 3)
@@ -279,7 +279,7 @@
 (dnf f-i8 "signed 8-bit immediate" ((MACH z80) all-isas) 15 8)
 ;(dnf f-e8 "signed 8-bit pcrel immediate" ((MACH z80) all-isas PCREL-ADDR) 15 8)
 (define-ifield
-  (name f-e8)
+  (name f-disp8)
   (comment "f-disp8")
   (attrs (MACH z80) all-isas PCREL-ADDR)
   (start 15)
@@ -290,6 +290,17 @@
 )
 (dnf f-u8 "unsigned 8-bit immediate" ((MACH z80) all-isas) 15 8)
 (dnf f-u16 "unsigned 16-bit immediate" ((MACH z80) all-isas) 23 16)
+(dnf f-addr16 "16-bit address" (ABS-ADDR (MACH z80) all-isas) 23 16)
+(define-ifield
+  (name f-rst)
+  (comment "f-rst")
+  (attrs (MACH z80) all-isas ABS-ADDR)
+  (start 5)
+  (length 3)
+  (mode UINT)
+  (encode (value pc) (srl QI value (const 3)))
+  (decode (value pc) (sll QI value (const 3)))
+)
 
 ;
 ;  CB table
@@ -312,7 +323,9 @@
 ;+------------------------+  +------+----+---+--------+  +----------+----------+
 ;
 
-(dnf f-1b "whole byte 1" ((MACH z80) all-isas) 15 8)
+;(dwf f-1 "whole byte 1" ((MACH z80) all-isas) 8 8 7 8 UINT (#f) (#f))
+
+(dnf f-1  "whole byte 1" ((MACH z80) all-isas) 15 8)
 (dnf f-1x "byte 1 field x, bits 7-6" ((MACH z80) all-isas) 15 2)
 (dnf f-1y "byte 1 field y, bits 5-3" ((MACH z80) all-isas) 13 3)
 (dnf f-1z "byte 1 field z, bits 2-0" ((MACH z80) all-isas) 10 3)
@@ -324,6 +337,7 @@
 (dnf f-1i8 "signed 8-bit immediate" ((MACH z80) all-isas) 23 8)
 (dnf f-1u8 "unsigned 8-bit immediate" ((MACH z80) all-isas) 23 8)
 (dnf f-1u16 "unsigned 16-bit immediate" ((MACH z80) all-isas) 31 16)
+(dnf f-1addr16 "16-bit address" ((MACH z80) all-isas) 31 16)
 
 ;
 ;  DD/FD CB table
@@ -334,27 +348,25 @@
 ;+----------+  +----------+  +----------+  +-----+--------+--------+
 
 ; next fields are used for DD/FD CB xx oo instructions
-(dnf f-3b "whole byte 3" ((MACH z80) all-isas) 15 8)
+(dnf f-3  "whole byte 3" ((MACH z80) all-isas) 15 8)
 (dnf f-3x "byte 3 field x, bits 7-6" ((MACH z80) all-isas) 23 2)
 (dnf f-3y "byte 3 field y, bits 5-3" ((MACH z80) all-isas) 23 3)
 (dnf f-3z "byte 3 field z, bits 2-0" ((MACH z80) all-isas) 18 3)
 
 ; Operands declaration
 ;
-(dnop od  "signed immediate 8-bit after first word"    () h-uint f-i8)
-(dnop ee  "signed pcrel immediate 8-bit after first word" () h-uint f-e8)
+(dnop od  "signed immediate 8-bit after first word"    () h-sint f-i8)
+(dnop ee  "signed pcrel immediate 8-bit after first word" () h-addr f-disp8)
 (dnop on  "unsigned immediate 8-bit after first word"  () h-uint f-u8)
 (dnop nn  "unsigned immediate 16-bit after first word" () h-uint f-u16)
+(dnop aa  "16-bit address after first word"            () h-addr f-addr16)
 (dnop oc  "reduced set of conditions"                  () h-cc f-s)
 (dnop cc  "set of conditions"                          () h-cc f-y)
 (dnop ss  "register pair BC, DE, HL, SP"               () h-ss  f-p)
 (dnop qq  "register pair BC, DE, HL, AF"               () h-qq  f-p)
 (dnop rd  "register B, C, D, E, H, L, A"               () h-mr8 f-y)
 (dnop rs  "register B, C, D, E, H, L, A"               () h-mr8 f-z)
-;(dnop alu "ALU operation"                              () h-alu8 f-y)
-(dnop rn  "RST immediate"                              () h-rst f-y)
-;(dnop ra  "register A"                                 () h-ra f-nil) 
-;(dnop rh  "register HL"                                () h-rh f-nil) 
+(dnop rn  "RST immediate"                              () h-addr f-rst)
 ;
 ; Instructions declaration
 ;
@@ -362,16 +374,16 @@
 (define-pmacro (d8i name attrs fz)
   (begin
     (dni (.sym name -mhl) (.str "operation " name " (hl)") attrs
-         (.str name " (hl)")
-         (+ (f-x 0) (f-y 6) (f-z fz))
-         ()
-         ()
+	 (.str name " (hl)")
+	 (+ (f-x 0) (f-y 6) (f-z fz))
+	 ()
+	 ()
     )
     (dni (.sym name -r) (.str "operation " name " r") attrs
-         (.str name " $rd")
-         (+ (f-x 0) rd (f-z fz))
-         ()
-         ()
+	 (.str name " $rd")
+	 (+ (f-x 0) rd (f-z fz))
+	 ()
+	 ()
     )
   )
 )
@@ -379,22 +391,22 @@
 (define-pmacro (dalu8i name attrs fy x-rd)
   (begin 
     (dni (.sym name -a-mhl) (.str "operation " name " " x-rd "(hl)") attrs
-         (.str name " " x-rd "(hl)")
-         (+ (f-x 2) (f-y fy) (f-z 6))
-         ()
-         ()
+	 (.str name " " x-rd "(hl)")
+	 (+ (f-x 2) (f-y fy) (f-z 6))
+	 ()
+	 ()
     )
     (dni (.sym name -a-r) (.str "operation " name " " x-rd "r") attrs
-         (.str name " " x-rd "$rs")
-         (+ (f-x 2) (f-y fy) rs)
-         ()
-         ()
+	 (.str name " " x-rd "$rs")
+	 (+ (f-x 2) (f-y fy) rs)
+	 ()
+	 ()
     )
     (dni (.sym name -a-n) (.str "operation " name " " x-rd "n") attrs
-         (.str name " " x-rd "$on")
-         (+ (f-x 3) (f-y fy) (f-z 6) on)
-         ()
-         ()
+	 (.str name " " x-rd "$on")
+	 (+ (f-x 3) (f-y fy) (f-z 6) on)
+	 ()
+	 ()
     )
   )
 )
@@ -403,11 +415,11 @@
 
 (dni ex-af-af   "exchange AF with AF'" (all-isas) "ex af,af`" (+ (f-x 0) (f-y 1) (f-z 0)) () ())
 
-(dni djnz-d     "decrease B and relative jump if B non zero" (all-isas COND-CTI) "djnz $ee" (+ (f-x 0) (f-y 2) (f-z 0) ee) () ()) ;FIXME
+(dni djnz-d     "decrease B and relative jump if B non zero" (all-isas COND-CTI) "djnz $ee" (+ (f-x 0) (f-y 2) (f-z 0) ee) () ())
 
-(dni jr-d       "relative jump" (all-isas UNCOND-CTI) "jr $ee" (+ (f-x 0) (f-y 3) (f-z 0) ee) () ()) ;FIXME
+(dni jr-d       "relative jump" (all-isas UNCOND-CTI) "jr $ee" (+ (f-x 0) (f-y 3) (f-z 0) ee) () ())
 
-(dni jr-cc-d    "conditional relative jump" (all-isas COND-CTI) "jr $oc,$ee" (+ (f-x 0) (f-r 1) oc (f-z 0) ee) () ()) ;FIXME
+(dni jr-cc-d    "conditional relative jump" (all-isas COND-CTI) "jr $oc,$ee" (+ (f-x 0) (f-r 1) oc (f-z 0) ee) () ())
 
 (dni ld-ss-nn   "load immediate value to register pair" (all-isas) "ld $ss,$nn" (+ (f-x 0) ss (f-q 0) (f-z 1) nn) () ())
 
@@ -421,13 +433,13 @@
 
 (dni ld-a-mde   "load A from memory addressed by DE" (all-isas) "ld a,(de)" (+ (f-x 0) (f-p 1) (f-q 1) (f-z 2)) () ())
 
-(dni ld-mnn-hl  "store HL to memory addressed by immediate" (all-isas) "ld ($nn),hl" (+ (f-x 0) (f-p 2) (f-q 0) (f-z 2) nn) () ())
+(dni ld-mnn-hl  "store HL to memory addressed by immediate" (all-isas) "ld ($aa),hl" (+ (f-x 0) (f-p 2) (f-q 0) (f-z 2) aa) () ())
 
-(dni ld-mnn-a   "store A to memory addressed by immediate" (all-isas) "ld ($nn),a" (+ (f-x 0) (f-p 3) (f-q 0) (f-z 2) nn) () ())
+(dni ld-mnn-a   "store A to memory addressed by immediate" (all-isas) "ld ($aa),a" (+ (f-x 0) (f-p 3) (f-q 0) (f-z 2) aa) () ())
 
-(dni ld-hl-mnn  "load HL from memory addressed by immediate" (all-isas) "ld hl,($nn)" (+ (f-x 0) (f-p 2) (f-q 1) (f-z 2) nn) () ())
+(dni ld-hl-mnn  "load HL from memory addressed by immediate" (all-isas) "ld hl,($aa)" (+ (f-x 0) (f-p 2) (f-q 1) (f-z 2) aa) () ())
 
-(dni ld-a-mnn   "load A from memory addressed by immediate" (all-isas) "ld a,($nn)" (+ (f-x 0) (f-p 3) (f-q 1) (f-z 2) nn) () ())
+(dni ld-a-mnn   "load A from memory addressed by immediate" (all-isas) "ld a,($aa)" (+ (f-x 0) (f-p 3) (f-q 1) (f-z 2) aa) () ())
 
 (dni inc-ss     "increment register pair" (all-isas) "inc $ss" (+ (f-x 0) ss (f-q 0) (f-z 3)) () ())
 (dni dec-ss     "decrement register pair" (all-isas) "dec $ss" (+ (f-x 0) ss (f-q 1) (f-z 3)) () ())
@@ -472,16 +484,19 @@
 (dni exx        "exx" (all-isas) "exx" (+ (f-x 3) (f-p 1) (f-q 1) (f-z 1)) () ())
 (dni jp-hl      "indirect jump to HL" (all-isas UNCOND-CTI) "jp (hl)" (+ (f-x 3) (f-p 2) (f-q 1) (f-z 1)) () ())
 (dni ld-sp-hl   "load HL value to SP" (all-isas) "ld sp,hl" (+ (f-x 3) (f-p 3) (f-q 1) (f-z 1)) () ())
-(dni jp-cc-nn   "conditional jump" (all-isas COND-CTI) "jp $cc,$nn" (+ (f-x 3) cc (f-z 2) nn) () ())
-(dni jp-nn      "jump to immediate address" (all-isas UNCOND-CTI) "jp $nn" (+ (f-x 3) (f-y 0) (f-z 3) nn) () ())
+(dni jp-cc-nn   "conditional jump" (all-isas COND-CTI) "jp $cc,$aa" (+ (f-x 3) cc (f-z 2) aa) () ())
+(dni jp-nn      "jump to immediate address" (all-isas UNCOND-CTI) "jp $aa" (+ (f-x 3) (f-y 0) (f-z 3) aa) () ())
 (dni out-mn-a   "write A to port n" (all-isas) "out ($on),a" (+ (f-x 3) (f-y 2) (f-z 3) on) () ())
 (dni in-a-mn    "read from port n to A" (all-isas) "in a,($on)" (+ (f-x 3) (f-y 3) (f-z 3) on) () ())
 (dni ex-msp-hl  "exchange HL with stack top" (all-isas) "ex sp,hl" (+ (f-x 3) (f-y 4) (f-z 3)) () ())
 (dni ex-de-hl   "exchange HL with DE" (all-isas) "ex de,hl" (+ (f-x 3) (f-y 5) (f-z 3)) () ())
 (dni di         "disable interrupts" (all-isas) "di" (+ (f-x 3) (f-y 6) (f-z 3)) () ())
 (dni ei         "enable interrupts" (all-isas) "ei" (+ (f-x 3) (f-y 7) (f-z 3)) () ())
-(dni call-cc-nn "conditional call" (all-isas COND-CTI) "call $cc,$nn" (+ (f-x 3) cc (f-z 4) nn) () ())
+(dni call-cc-nn "conditional call" (all-isas COND-CTI) "call $cc,$aa" (+ (f-x 3) cc (f-z 4) aa) () ())
 (dni push-qq    "push register pair" (all-isas) "push $qq" (+ (f-x 3) qq (f-q 0) (f-z 5)) () ())
-(dni call-nn    "call to immediate address" (all-isas UNCOND-CTI) "call $nn" (+ (f-x 3) (f-p 0) (f-q 1) (f-z 5) nn) () ())
-(dni rst-n      "restart from (call) address n" (all-isas UNCOND-CTI) "rst $rn" (+ (f-x 3) rn (f-z 6)) () ())
+(dni call-nn    "call to immediate address" (all-isas UNCOND-CTI) "call $aa" (+ (f-x 3) (f-p 0) (f-q 1) (f-z 5) aa) () ())
+(dni rst-n      "restart from (call) address n" (all-isas UNCOND-CTI) "rst $rn" (+ (f-x 3) rn (f-z 7)) () ())
 
+; ED prefixed
+(dni retn       "return from NMI handler" (all-isas UNCOND-CTI) "retn" (+ (f-0 #xED) (f-1 #x45)) () ())
+(dni reti       "return from INT handler" (all-isas UNCOND-CTI) "reti" (+ (f-0 #xED) (f-1 #x4D)) () ())
