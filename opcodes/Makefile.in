@@ -408,6 +408,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -472,6 +473,7 @@ HFILES = \
 	sysdep.h \
 	xc16x-desc.h xc16x-opc.h \
 	xstormy16-desc.h xstormy16-opc.h \
+	z80-desc.h z80-opc.h \
 	z8k-opc.h
 
 
@@ -659,6 +661,8 @@ TARGET_LIBOPCODES_CFILES = \
 	xgate-dis.c \
 	xgate-opc.c \
 	z80-dis.c \
+	z80-ibld.c \
+	z80-opc.c \
 	z8k-dis.c
 
 
@@ -714,7 +718,7 @@ POTFILES = $(HFILES) $(CFILES)
 CLEANFILES = \
 	stamp-epiphany stamp-fr30 stamp-frv stamp-ip2k stamp-iq2000 stamp-lm32 \
 	stamp-m32c stamp-m32r stamp-mep stamp-mt \
-	stamp-or1k stamp-xc16x stamp-xstormy16 \
+	stamp-or1k stamp-xc16x stamp-xstormy16 stamp-z80 \
 	libopcodes.a stamp-lib
 
 CGENDIR = @cgendir@
@@ -728,7 +732,7 @@ CGENDEPS = \
 	$(CGENDIR)/opc-opinst.scm \
 	cgen-asm.in cgen-dis.in cgen-ibld.in
 
-CGEN_CPUS = epiphany fr30 frv ip2k iq2000 lm32 m32c m32r mep mt or1k xc16x xstormy16
+CGEN_CPUS = epiphany fr30 frv ip2k iq2000 lm32 m32c m32r mep mt or1k xc16x xstormy16 z80
 @CGEN_MAINT_FALSE@BPF_DEPS = 
 @CGEN_MAINT_TRUE@BPF_DEPS = stamp-bpf
 @CGEN_MAINT_FALSE@EPIPHANY_DEPS = 
@@ -757,6 +761,8 @@ CGEN_CPUS = epiphany fr30 frv ip2k iq2000 lm32 m32c m32r mep mt or1k xc16x xstor
 @CGEN_MAINT_TRUE@XC16X_DEPS = stamp-xc16x
 @CGEN_MAINT_FALSE@XSTORMY16_DEPS = 
 @CGEN_MAINT_TRUE@XSTORMY16_DEPS = stamp-xstormy16
+@CGEN_MAINT_FALSE@Z80_DEPS = 
+@CGEN_MAINT_TRUE@Z80_DEPS = stamp-z80
 MOSTLYCLEANFILES = aarch64-gen$(EXEEXT_FOR_BUILD) i386-gen$(EXEEXT_FOR_BUILD) \
 	ia64-gen$(EXEEXT_FOR_BUILD) s390-mkopc$(EXEEXT_FOR_BUILD) s390-opc.tab \
 	z8kgen$(EXEEXT_FOR_BUILD) opc2c$(EXEEXT_FOR_BUILD)
@@ -1073,6 +1079,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xstormy16-opc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xtensa-dis.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/z80-dis.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/z80-ibld.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/z80-opc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/z8k-dis.Plo@am__quote@
 
 .c.o:
@@ -1507,6 +1515,14 @@ $(srcdir)/xstormy16-desc.h $(srcdir)/xstormy16-desc.c $(srcdir)/xstormy16-opc.h 
 stamp-xstormy16: $(CGENDEPS) $(CPUDIR)/xstormy16.cpu $(CPUDIR)/xstormy16.opc
 	$(MAKE) run-cgen arch=xstormy16 prefix=xstormy16 options= \
 		archfile=$(CPUDIR)/xstormy16.cpu opcfile=$(CPUDIR)/xstormy16.opc extrafiles=
+
+$(srcdir)/z80-desc.h $(srcdir)/z80-desc.c $(srcdir)/z80-opc.h $(srcdir)/z80-opc.c $(srcdir)/z80-ibld.c $(srcdir)/z80-asm.c $(srcdir)/z80-dis.c: $(Z80_DEPS)
+	@true
+stamp-z80: $(CGENDEPS) $(CPUDIR)/z80.cpu $(CPUDIR)/z80.opc
+	$(MAKE) run-cgen arch=z80 prefix=z80 options= \
+		archfile=$(CPUDIR)/z80.cpu \
+		opcfile=$(CPUDIR)/z80.opc \
+		extrafiles=
 
 aarch64-gen$(EXEEXT_FOR_BUILD): aarch64-gen.o $(BUILD_LIB_DEPS)
 	$(LINK_FOR_BUILD) aarch64-gen.o $(BUILD_LIBS)
