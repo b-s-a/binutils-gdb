@@ -114,7 +114,7 @@ const CGEN_ATTR_TABLE z80_cgen_insn_attr_table[] =
 /* Instruction set variants.  */
 
 static const CGEN_ISA z80_cgen_isa_table[] = {
-  { "z80", 8, 8, 8, 24 },
+  { "z80", 8, 32, 8, 24 },
   { 0, 0, 0, 0, 0 }
 };
 

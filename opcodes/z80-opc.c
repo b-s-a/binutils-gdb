@@ -51,15 +51,15 @@ static const CGEN_IFMT ifmt_nop ATTRIBUTE_UNUSED = {
 };
 
 static const CGEN_IFMT ifmt_djnz_d ATTRIBUTE_UNUSED = {
-  8, 16, 0xff, { { F (F_X) }, { F (F_DISP8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
+  16, 16, 0xff, { { F (F_X) }, { F (F_DISP8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_jr_cc_d ATTRIBUTE_UNUSED = {
-  8, 16, 0xe7, { { F (F_X) }, { F (F_DISP8) }, { F (F_R) }, { F (F_S) }, { F (F_Z) }, { 0 } }
+  16, 16, 0xe7, { { F (F_X) }, { F (F_DISP8) }, { F (F_R) }, { F (F_S) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_ld_ss_nn ATTRIBUTE_UNUSED = {
-  8, 24, 0xcf, { { F (F_U16) }, { F (F_X) }, { F (F_P) }, { F (F_Q) }, { F (F_Z) }, { 0 } }
+  24, 24, 0xcf, { { F (F_U16) }, { F (F_X) }, { F (F_P) }, { F (F_Q) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_add_hl_ss ATTRIBUTE_UNUSED = {
@@ -71,7 +71,7 @@ static const CGEN_IFMT ifmt_ld_mbc_a ATTRIBUTE_UNUSED = {
 };
 
 static const CGEN_IFMT ifmt_ld_mnn_hl ATTRIBUTE_UNUSED = {
-  8, 24, 0xff, { { F (F_ADDR16) }, { F (F_X) }, { F (F_P) }, { F (F_Q) }, { F (F_Z) }, { 0 } }
+  24, 24, 0xff, { { F (F_ADDR16) }, { F (F_X) }, { F (F_P) }, { F (F_Q) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_inc_r ATTRIBUTE_UNUSED = {
@@ -79,11 +79,11 @@ static const CGEN_IFMT ifmt_inc_r ATTRIBUTE_UNUSED = {
 };
 
 static const CGEN_IFMT ifmt_ld_mhl_n ATTRIBUTE_UNUSED = {
-  8, 16, 0xff, { { F (F_X) }, { F (F_U8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
+  16, 16, 0xff, { { F (F_X) }, { F (F_U8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_ld_r_n ATTRIBUTE_UNUSED = {
-  8, 16, 0xc7, { { F (F_X) }, { F (F_U8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
+  16, 16, 0xc7, { { F (F_X) }, { F (F_U8) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_ld_mhl_r ATTRIBUTE_UNUSED = {
@@ -103,11 +103,11 @@ static const CGEN_IFMT ifmt_pop_qq ATTRIBUTE_UNUSED = {
 };
 
 static const CGEN_IFMT ifmt_jp_cc_nn ATTRIBUTE_UNUSED = {
-  8, 24, 0xc7, { { F (F_ADDR16) }, { F (F_X) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
+  24, 24, 0xc7, { { F (F_ADDR16) }, { F (F_X) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_jp_nn ATTRIBUTE_UNUSED = {
-  8, 24, 0xff, { { F (F_ADDR16) }, { F (F_X) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
+  24, 24, 0xff, { { F (F_ADDR16) }, { F (F_X) }, { F (F_Y) }, { F (F_Z) }, { 0 } }
 };
 
 static const CGEN_IFMT ifmt_rst_n ATTRIBUTE_UNUSED = {
@@ -115,7 +115,7 @@ static const CGEN_IFMT ifmt_rst_n ATTRIBUTE_UNUSED = {
 };
 
 static const CGEN_IFMT ifmt_retn ATTRIBUTE_UNUSED = {
-  8, 16, 0xff, { { F (F_0) }, { F (F_1) }, { 0 } }
+  16, 16, 0xff, { { F (F_0) }, { F (F_1) }, { 0 } }
 };
 
 #undef F

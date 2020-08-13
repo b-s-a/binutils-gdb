@@ -26,7 +26,7 @@
   ;(attrs attribute-list)
   (default-insn-word-bitsize 8) ; Used in computing bit numbers.
   (default-insn-bitsize 8) ; The minimum size of an instruction
-  (base-insn-bitsize 8) ; Number of bytes of insn we can initially fetch.
+  (base-insn-bitsize 32) ; Number of bytes of insn we can initially fetch.
   ;(decode-assist (7 6)) ; Initial bitnumbers to decode insns by.
   ;(liw-insns 1) ; The number of instructions the CPU always fetches at once.
   ;(parallel-insns 1)
